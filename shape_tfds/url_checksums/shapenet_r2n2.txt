@@ -1,0 +1,1 @@
+http://cvgl.stanford.edu/data2/ShapeNetVox32.tgz 22218020 21797cf9310771f9fd1f4bc1abbb99c5cc6235bfc9f4864f688e0edeaa7c204b
