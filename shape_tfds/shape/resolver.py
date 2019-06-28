@@ -13,12 +13,9 @@ class ZipSubdirResolver(trimesh.visual.resolvers.Resolver):
         self.subdir = subdir
         print(self.subdir)
 
-    def get(self, name, read=False):
+    def get(self, name):
         name = name.lstrip()
         if name.startswith('./'):
             name = name[2:]
         fp = self.archive.open(os.path.join(self.subdir, name))
-        if read:
-            return fp.read()
-        else:
-            return fp
+        return fp.read()

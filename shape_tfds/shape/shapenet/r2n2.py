@@ -150,11 +150,10 @@ class ShapenetR2n2Config(tfds.core.BuilderConfig):
     self.synset_name = synset_name(synset)
     super(ShapenetR2n2Config, self).__init__(
         name=self.synset_id,
-        version=tfds.core.Version(0, 0, 1),
+        version=tfds.core.Version("0.0.1"),
         description=(
           "Multi-view renderings/voxels for ShapeNet synset %s (%s)"
-          % (self.synset_name, self.synset_id))
-    )
+          % (self.synset_name, self.synset_id)))
 
 
 class ShapenetR2n2(tfds.core.GeneratorBasedBuilder):
@@ -167,8 +166,11 @@ class ShapenetR2n2(tfds.core.GeneratorBasedBuilder):
     features = tfds.features.FeaturesDict(dict(
         synset_id=tfds.features.ClassLabel(names=synset_ids()),
         example_id=tfds.features.Text(),
-        voxels=sds.features.PaddedTensor(
-          sds.features.BinaryRunLengthEncodedFeature(shape=VOXEL_SHAPE)),
+        voxels=sds.core.features.PaddedTensor(
+          sds.core.features.ShapedTensor(
+            sds.core.features.BinaryRunLengthEncodedFeature(), (None,)*3),
+          padded_shape=VOXEL_SHAPE),
+        # voxels=sds.core.features.ShapedTensor(sds.core.features.BinaryRunLengthEncodedFeature(size=np.prod(VOXEL_SHAPE)), shape=VOXEL_SHAPE),
         renderings=tfds.features.Sequence(
           dict(
             image=tfds.features.Image(shape=IMAGE_SHAPE),
@@ -255,10 +257,10 @@ class ShapenetR2n2(tfds.core.GeneratorBasedBuilder):
       with tf.io.gfile.GFile(binvox_path, mode="rb") as fp:
         voxel = trimesh.load(fp, file_type='binvox')
       encoding, padding = voxel.encoding.stripped
-      brle = encoding.binary_run_length_data(dtype=np.int64)
       return dict(
-        stripped=(encoding.shape, brle),
+        stripped=encoding.dense,
         padding=padding)
+      # return voxel.encoding.dense
 
     for example_id in example_ids:
       images = [

@@ -11,25 +11,28 @@ import os
 import numpy as np
 import tensorflow_datasets as tfds
 import trimesh
-from ige.vox.data import core as c
-from ige.vox.data.transformations import look_at
-from ige.vox.data.resolver import ZipSubdirResolver
+from shape_tfds.shape.shapenet import core as c
+from shape_tfds.shape.resolver import ZipSubdirResolver
+from shape_tfds.shape.shapenet.core.views import CameraMutator
+from shape_tfds.shape.shapenet.core.views import fix_axes
 
 
 class ShapenetCoreRenderConfig(c.ShapenetCoreConfig):
-    def __init__(self, synset_id, resolution=(128, 128)):
+    def __init__(self, synset_id, resolution=(128, 128), camera_mutator=None):
         self._synset_id = synset_id
-        if isinstance(resolution, int):
-            resolution = (resolution,)*2
-        else:
-            resolution = tuple(resolution)
-            assert(all(isinstance(r, int) for r in resolution))
+        self._camera_mutator = (
+            CameraMutator() if camera_mutator is None else camera_mutator)
         self._resolution = resolution
-
+        ny, nx = resolution
         super(ShapenetCoreRenderConfig, self).__init__(
-            name='render-%s-%dx%d' % ((synset_id,) + resolution),
+            name='render-%dx%d-%s-%s' % (
+                ny, nx, self._camera_mutator.name, synset_id),
             description='shapenet core renderings',
             version=tfds.core.Version("0.0.1"))
+    
+    @property
+    def seed(self):
+        return self._seed
 
     def features(self):
         return tfds.core.features.FeaturesDict(dict(
@@ -46,7 +49,7 @@ class ShapenetCoreRenderConfig(c.ShapenetCoreConfig):
         return self._resolution
 
     def loader(self, archive):
-        return ExampleLoader(archive)
+        return RenderLoader(archive, self._camera_mutator, self._resolution)
 
 
 def fix_visual(visual):
@@ -83,23 +86,24 @@ def fix_scene_visuals(scene):
         fix_geometry_visuals(v)
 
 
-class ExampleLoader(c.ExampleLoader):
+class RenderLoader(c.ExampleLoader):
+    def __init__(self, archive, camera_mutator, resolution):
+        super(RenderLoader, self).__init__(archive)
+        self._camera_mutator = camera_mutator
+        self._resolution = resolution
+
     def __call__(self, model_path, model_id):
         import trimesh
         model_dir, filename = os.path.split(model_path)
-        print(model_id)
         resolver = ZipSubdirResolver(self.archive, model_dir)
         scene = trimesh.load(
-            resolver.get(filename, read=False), file_type='obj',
+            trimesh.util.wrap_as_stream(resolver.get(filename)),
+            file_type='obj',
             resolver=resolver)
         fix_scene_visuals(scene)
-        transform = look_at(
-            np.array([1, 1, 1], dtype=np.float64), world_up=[0, 1, 0])
-        resolution = (1024, 1024)
-        camera = trimesh.scene.cameras.Camera(
-            fov=(60, 60), resolution=resolution, transform=transform)
-        scene.camera = camera
-        scene.show()
+        fix_axes(scene)
+        for _ in self._camera_mutator(scene.camera, self._resolution):
+            scene.show()
         # raise Exception('still at debug stage')
 
 
