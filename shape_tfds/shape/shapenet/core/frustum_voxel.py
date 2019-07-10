@@ -7,11 +7,11 @@ import os
 import time
 import numpy as np
 import tensorflow_datasets as tfds
-from shape_tfds.shape.shapenet import core as c
+from shape_tfds.shape.shapenet.core import base 
 from shape_tfds.shape.resolver import ZipSubdirResolver
 from shape_tfds.core.features import PaddedTensor
 from shape_tfds.core.features import BinaryRunLengthEncodedFeature
-from shape_tfds.shape.shapenet.core.views import CameraMutator
+from shape_tfds.shape.shapenet.core.views import SceneMutator
 from shape_tfds.shape.shapenet.core.views import fix_axes
 import trimesh
 
@@ -34,16 +34,16 @@ def symmetric_frustum_matrix(near, far, width, height):
     return frustum_matrix(near, far, -dx, dx, -dy, dy)
 
 
-class ShapenetCoreFrustumVoxelConfig(c.ShapenetCoreConfig):
-    def __init__(self, synset_id, resolution=64,  camera_mutator=None):
-        if camera_mutator is None:
-            camera_mutator = CameraMutator()
-        self._camera_mutator = camera_mutator
+class ShapenetCoreFrustumVoxelConfig(base.ShapenetCoreConfig):
+    def __init__(self, synset_id, resolution=64, scene_mutator=None):
+        if scene_mutator is None:
+            scene_mutator = SceneMutator()
+        self._scene_mutator = scene_mutator
         self._synset_id = synset_id
         self._resolution = resolution
         super(ShapenetCoreFrustumVoxelConfig, self).__init__(
             name='frust_vox-%d-%s-%s' % (
-                resolution, camera_mutator.name, synset_id),
+                resolution, scene_mutator.name, synset_id),
             description='shapenet core voxels',
             version=tfds.core.Version("0.0.1"))
     
@@ -52,18 +52,23 @@ class ShapenetCoreFrustumVoxelConfig(c.ShapenetCoreConfig):
         return self._synset_id
 
     def features(self):
+        import shape_tfds as sds
         return tfds.core.features.FeaturesDict(dict(
-            voxels=PaddedTensor(
-                BinaryRunLengthEncodedFeature((self._resolution,)*3))))
+            voxels=sds.core.features.PaddedTensor(
+                sds.core.features.ShapedTensor(
+                    sds.core.features.BinaryRunLengthEncodedFeature(),
+                    (None,)*3),
+                padded_shape=(self._resolution,)*3),
+        example_id=tfds.core.features.Text()))
     
     def loader(self, archive):
-        return VoxelLoader(archive, self._resolution, self._camera_mutator)
+        return VoxelLoader(archive, self._resolution, self._scene_mutator)
 
 
-class VoxelLoader(c.ExampleLoader):
-    def __init__(self, archive, resolution, camera_mutator):
+class VoxelLoader(base.ExampleLoader):
+    def __init__(self, archive, resolution, scene_mutator):
         self._resolution = resolution
-        self._camera_mutator = camera_mutator
+        self._scene_mutator = scene_mutator
         super(VoxelLoader, self).__init__(archive=archive)
 
     def __call__(self, model_path, model_id):
@@ -72,8 +77,9 @@ class VoxelLoader(c.ExampleLoader):
         import matplotlib.pyplot as plt
         model_dir, filename = os.path.split(model_path)
         resolver = ZipSubdirResolver(self.archive, model_dir)
-        file_obj = resolver.get(filename)
-        scene = trimesh.load(file_obj, file_type='obj', resolver=resolver)
+        scene = trimesh.load(
+            trimesh.util.wrap_as_stream(resolver.get(filename)),
+            file_type='obj', resolver=resolver)
         if hasattr(scene, 'geometry'):
             mesh = trimesh.util.concatenate([
                 trimesh.Trimesh(vertices=m.vertices, faces=m.faces)
@@ -83,44 +89,48 @@ class VoxelLoader(c.ExampleLoader):
 
         fix_axes(mesh)
         scene = mesh.scene()
-        for camera in self._camera_mutator(scene.camera):
-            scene.show()
-            dist = np.linalg.norm(camera.transform[:3, 3])
+        position, _ = self._scene_mutator(scene, (self._resolution,)*2)
+        dist = np.linalg.norm(position)
 
-            vox = mesh.voxelized(
-                pitch=1./self._resolution, method='binvox',
-                bounding_box=[-0.5, -0.5, -0.5, 0.5, 0.5, 0.5], exact=True)
-            vox.fill(method='orthographic')
-            origin, rays, angles = camera.to_rays()
-            origin = origin[0]
-            rays = rays.reshape((self._resolution, self._resolution, 3))
-            # rays = rays[-1::-1, -1::-1]
-            del angles
-            z = np.linspace(dist - 0.5, dist + 0.5, self._resolution)
-            coords = np.expand_dims(rays, axis=-2) * np.expand_dims(z, axis=-1)
-            coords += origin
-            coords = coords[:, :, -1::-1]
+        camera = scene.camera
+        
+        vox = mesh.voxelized(
+            pitch=1./self._resolution, method='binvox',
+            bounding_box=[-0.5, -0.5, -0.5, 0.5, 0.5, 0.5], exact=True)
+        vox.fill(method='orthographic')
+        origin, rays = camera.to_rays(scene.camera_transform)
+        rays = rays.reshape((self._resolution, self._resolution, 3))
+        z = np.linspace(dist - 0.5, dist + 0.5, self._resolution)
+        coords = np.expand_dims(rays, axis=-2) * np.expand_dims(z, axis=-1)
+        coords += origin
 
-            frust_vox_dense = vox.is_filled(coords)
-            frust_vox = trimesh.voxel.VoxelGrid(frust_vox_dense)
-            frust_vox.show()
-            proj = np.any(frust_vox_dense, axis=-1)
-            plt.imshow(proj.T)
-            plt.show()
+        frust_vox_dense = vox.is_filled(coords)
+        frust_vox_dense = frust_vox_dense.transpose((1, 0, 2))  # y, x, z
+        frust_vox = trimesh.voxel.VoxelGrid(frust_vox_dense).encoding
+        stripped, padding = frust_vox.stripped
 
-        # print(extents)
-        # vox.show()
+        return dict(
+            voxels=dict(stripped=stripped.dense, padding=padding),
+            example_id=model_id,
+        )
 
 
 if __name__ == '__main__':
-    ids, names = c.load_synset_ids()
+    ids, names = base.load_synset_ids()
 
-    # name = 'suitcase'
+    synset_name = 'suitcase'
     # name = 'watercraft'
     # name = 'aeroplane'
     # name = 'table'
-    name = 'rifle'
+    # name = 'rifle'
 
-    config = ShapenetCoreFrustumVoxelConfig(synset_id=ids[name], resolution=64)
-    builder = c.ShapenetCore(config=config)
+
+    seed = 0
+
+    config = ShapenetCoreFrustumVoxelConfig(
+        synset_id=ids[synset_name],
+        scene_mutator=SceneMutator(name='base%03d' % seed, seed=seed),
+        resolution=64)
+
+    builder = base.ShapenetCore(config=config)
     builder.download_and_prepare()

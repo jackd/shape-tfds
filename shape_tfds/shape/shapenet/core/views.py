@@ -61,18 +61,27 @@ def get_random_camera_position(
     )
 
 
-class CameraMutator(object):
+class SceneMutator(object):
     def __init__(
-                self, name='base', seed=152, num_views=2,
-                focal=32./35, dist=1.166, theta=(0., 360.), phi=(60., 65.)):
+            self, name='base', seed=152, focal=32./35, dist=1.166,
+            theta=(0., 360.), phi=(60., 65.)):
         self._seed = seed
-        self._num_views = num_views
         self._focal = focal
         self._dist = dist
         self._theta = theta
         self._phi = phi
         self._name = name
         self.reset()
+    
+    def copy(self):
+        return SceneMutator(
+            name=self._name,
+            seed=self._seed,
+            focal=self._focal,
+            dist=self._dist,
+            theta=self._theta,
+            phi=self._phi
+        )
 
     @property
     def name(self):
@@ -81,11 +90,6 @@ class CameraMutator(object):
     @property
     def seed(self):
         return self._seed
-
-
-    @property
-    def num_views(self):
-        return self._num_views
 
     @property
     def dist(self):
@@ -102,16 +106,16 @@ class CameraMutator(object):
     def reset(self):
         self._random = np.random.RandomState(self._seed)  # pylint: disable=no-member
 
-    def __call__(self, camera, resolution):
+    def __call__(self, scene, resolution):
         resolution = np.array(resolution)
+        camera = scene.camera
         camera.resolution = resolution
-        focals = _get_random(self._random, self._focal, self._num_views)
-        positions = get_random_camera_position(
-            self._random, self._dist, self._theta, self._phi, self._num_views)
-        for focal, position in zip(focals, positions):
-            camera.transform = transformations.look_at(position)
-            camera.focal = focal*resolution
-            yield camera
+        focal = _get_random(self._random, self._focal, size=None)
+        position = get_random_camera_position(
+            self._random, self._dist, self._theta, self._phi, num_views=None)
+        scene.camera_transform = transformations.look_at(position)
+        camera.focal = focal*resolution
+        return position, focal
 
 
 _axes_fix_transform = np.array([

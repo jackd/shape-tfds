@@ -7,7 +7,7 @@ import os
 import time
 import numpy as np
 import tensorflow_datasets as tfds
-from shape_tfds.shape.shapenet import core as c
+from shape_tfds.shape.shapenet.core import base
 from shape_tfds.shape.resolver import ZipSubdirResolver
 from shape_tfds.shape.shapenet.core.views import fix_axes
 from shape_tfds.core.features import PaddedTensor
@@ -33,7 +33,7 @@ def symmetric_frustum_matrix(near, far, width, height):
     return frustum_matrix(near, far, -dx, dx, -dy, dy)
 
 
-class ShapenetCoreVoxelConfig(c.ShapenetCoreConfig):
+class ShapenetCoreVoxelConfig(base.ShapenetCoreConfig):
     def __init__(self, synset_id, resolution=64):
         self._synset_id = synset_id
         self._resolution = resolution
@@ -55,7 +55,7 @@ class ShapenetCoreVoxelConfig(c.ShapenetCoreConfig):
         return VoxelLoader(archive, self._resolution)
 
 
-class VoxelLoader(c.ExampleLoader):
+class VoxelLoader(base.ExampleLoader):
     def __init__(self, archive, resolution):
         self._resolution = resolution
         super(VoxelLoader, self).__init__(archive=archive)
@@ -85,7 +85,7 @@ class VoxelLoader(c.ExampleLoader):
         return dict(voxels=(vox.encoding.dense, padding))
 
 if __name__ == '__main__':
-    ids, names = c.load_synset_ids()
+    ids, names = base.load_synset_ids()
 
     # name = 'suitcase'
     # name = 'watercraft'
@@ -94,5 +94,5 @@ if __name__ == '__main__':
     name = 'rifle'
 
     config = ShapenetCoreVoxelConfig(synset_id=ids[name], resolution=32)
-    builder = c.ShapenetCore(config=config)
+    builder = base.ShapenetCore(config=config)
     builder.download_and_prepare()
