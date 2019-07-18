@@ -15,13 +15,31 @@ synset_name = 'suitcase'
 # name = 'table'
 # name = 'rifle'
 
+
+def vis(image, voxels):
+    # visualize a single image/voxel pair
+    import matplotlib.pyplot as plt
+    # This import registers the 3D projection, but is otherwise unused.
+    from mpl_toolkits.mplot3d import Axes3D
+
+    # and plot everything
+    fig = plt.figure()
+    ax = fig.gca()
+    ax.imshow(image)
+    ax.axis("off")
+    fig = plt.figure()
+    ax = fig.gca(projection="3d")
+    ax.voxels(voxels)
+    # ax.axis("square")
+    plt.show()
+
+
 synset_id = ids[synset_name]
 mutator = core.SceneMutator(seed=seed, name='base%03d' % seed)
 
 configs = dict(
     image=core.ShapenetCoreRenderConfig(synset_id, scene_mutator=mutator),
-    voxels=core.ShapenetCoreFrustumVoxelConfig(
-        synset_id, scene_mutator=mutator, resolution=128))
+    voxels=core.ShapenetCoreVoxelConfig(synset_id, resolution=32))
 builders = {k: core.ShapenetCore(config=config)
             for k, config in configs.items()}
 for b in builders.values():
@@ -34,18 +52,7 @@ datasets = {
 dataset = tf.data.Dataset.zip(datasets)
 
 
-def vis():
-    import matplotlib.pyplot as plt
-    for example in dataset:
-        image = example['image'].numpy()
-        voxels = tf.reduce_any(example['voxels'], axis=-1).numpy()
-        image[np.logical_not(voxels)] = 0
-        plt.imshow(image)
-        plt.show()
-        # _, (ax0, ax1) = plt.subplots(1, 2)
-        # ax0.imshow(image)
-        # ax1.imshow(voxels)
-        # plt.show()
-
-
-vis()
+for example in dataset:
+    image = example['image'].numpy()
+    voxels = example['voxels'].numpy()
+    vis(image, voxels)

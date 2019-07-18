@@ -37,10 +37,10 @@ class StaticShapedTensor(top_level_feature.TopLevelFeature):
         'unknown dimensions.')
     self._base_feature = base_feature
     self._shape = shape
-  
+
   def get_tensor_info(self):
     return features.TensorInfo(shape=self._shape, dtype=self._base_info.dtype)
-  
+
   def encode_example(self, example_data):
     return self._base_feature.encode_example(np.reshape(
       example_data, [-1 if s is None else s for s in self._base_info.shape]))
@@ -48,17 +48,17 @@ class StaticShapedTensor(top_level_feature.TopLevelFeature):
   def decode_example(self, tfexample_data):
     base = self._base_feature.decode_example(tfexample_data)
     return tf.reshape(base, [-1 if s is None else s for s in self._shape])
-  
+
   def get_serialized_info(self):
     """See base class for details."""
     return self._base_feature.get_serialized_info()
-  
+
   def save_metadata(self, data_dir, feature_name):
     return self._base_feature.save_metadata(data_dir, '%s-base' % feature_name)
-  
+
   def load_metadata(self, data_dir, feature_name):
     return self._base_feature.load_metadata(data_dir, '%s-base' % feature_name)
-  
+
 
 class DynamicShapedTensor(features.FeatureConnector):
   def __init__(self, base_feature, shape):
@@ -75,11 +75,11 @@ class DynamicShapedTensor(features.FeatureConnector):
     self._shape_tuple = shape
     self._base = base_feature
     self._shape = features.Tensor(shape=(len(shape),), dtype=tf.int64)
-  
+
   def get_tensor_info(self):
     return features.TensorInfo(
       shape=self._shape_tuple, dtype=self._base_info.dtype)
-  
+
   def get_serialized_info(self):
     return util.flatten_dicts(dict(
       base=self._base.get_serialized_info(),
@@ -91,11 +91,12 @@ class DynamicShapedTensor(features.FeatureConnector):
     return tf.reshape(
       self._base.decode_example(tfexample_data['base']),
       self._shape.decode_example(tfexample_data['shape']))
-  
+
   def encode_example(self, example_data):
+    base_data = np.reshape(
+        example_data, [-1 if s is None else s for s in self._base_info.shape])
     return util.flatten_dicts(dict(
-      base=self._base.encode_example(np.reshape(
-        example_data, [-1 if s is None else s for s in self._base_info.shape])),
+      base=self._base.encode_example(base_data),
       shape=self._shape.encode_example(example_data.shape)))
 
 def ShapedTensor(base_feature, shape):

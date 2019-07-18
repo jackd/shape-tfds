@@ -36,10 +36,10 @@ class RunLengthEncodedFeatureBase(features.FeatureConnector):
 
   def get_serialized_info(self):
     return tfds.features.TensorInfo(shape=(None,), dtype=self._encoded_dtype)
-  
+
   def get_tensor_info(self):
     return tfds.features.TensorInfo(shape=(self._size,), dtype=self._dtype)
-  
+
   def _shaped(self, decoded):
     if self._size is not None:
       decoded.set_shape((self._size))
@@ -82,7 +82,7 @@ class BinaryRunLengthEncodedFeature(RunLengthEncodedFeatureBase):
 
   def decode_example(self, tfexample_data):
     return self._shaped(tf_impl.brle_to_dense(tfexample_data))
-  
+
   def encode_example(self, example_data):
     _check_dtype(example_data.dtype, self._dtype.as_numpy_dtype)
     _check_size(example_data.size, self._size)

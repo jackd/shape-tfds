@@ -165,12 +165,8 @@ class ShapenetR2n2(tfds.core.GeneratorBasedBuilder):
   def _info(self):
     features = tfds.features.FeaturesDict(dict(
         synset_id=tfds.features.ClassLabel(names=synset_ids()),
-        example_id=tfds.features.Text(),
-        voxels=sds.core.features.PaddedTensor(
-          sds.core.features.ShapedTensor(
-            sds.core.features.BinaryRunLengthEncodedFeature(), (None,)*3),
-          padded_shape=VOXEL_SHAPE),
-        # voxels=sds.core.features.ShapedTensor(sds.core.features.BinaryRunLengthEncodedFeature(size=np.prod(VOXEL_SHAPE)), shape=VOXEL_SHAPE),
+        model_id=tfds.features.Text(),
+        voxels=sds.core.features.BinaryVoxel(VOXEL_SHAPE),
         renderings=tfds.features.Sequence(
           dict(
             image=tfds.features.Image(shape=IMAGE_SHAPE),
@@ -193,7 +189,7 @@ class ShapenetR2n2(tfds.core.GeneratorBasedBuilder):
     from tensorflow_datasets.core.download import resource
     # Unfortunately the files at these urls are twice the size they need to be
     # since the archives contain an inner archive containing almost
-    # everything in the rest of the outer archive. 
+    # everything in the rest of the outer archive.
     resources = dict(
         voxels="http://cvgl.stanford.edu/data2/ShapeNetVox32.tgz",
         renderings="http://cvgl.stanford.edu/data2/ShapeNetRendering.tgz")
@@ -214,8 +210,8 @@ class ShapenetR2n2(tfds.core.GeneratorBasedBuilder):
 
     synset_id = self.builder_config.synset_id
     voxels_dir = os.path.join(base_voxels_dir, synset_id)
-    example_ids = tf.io.gfile.listdir(voxels_dir)
-    train_ids, test_ids = _get_id_split(example_ids)
+    model_ids = tf.io.gfile.listdir(voxels_dir)
+    train_ids, test_ids = _get_id_split(model_ids)
     kwargs = dict(
       synset_id=synset_id,
       voxels_dir=voxels_dir,
@@ -225,18 +221,24 @@ class ShapenetR2n2(tfds.core.GeneratorBasedBuilder):
     return [
         tfds.core.SplitGenerator(
             name=tfds.Split.TRAIN, num_shards=len(train_ids) // 1000 + 1,
-            gen_kwargs=dict(example_ids=train_ids, **kwargs)),
+            gen_kwargs=dict(model_ids=train_ids, **kwargs)),
         tfds.core.SplitGenerator(
             name=tfds.Split.TEST, num_shards=len(test_ids) // 1000 + 2,
-            gen_kwargs=dict(example_ids=test_ids, **kwargs))
+            gen_kwargs=dict(model_ids=test_ids, **kwargs))
     ]
 
-  def _generate_examples(
-      self, synset_id, example_ids, voxels_dir, renderings_dir):
+  def _generate_examples(self, **kwargs):
+        gen = self._generate_example_data(**kwargs)
+        return (
+            (((v['synset_id'], v['model_id']), v) for v in gen)
+            if self.version.implements(tfds.core.Experiment.S3) else gen)
 
-    def load_image(example_id, image_index):
+  def _generate_example_data(
+      self, synset_id, model_ids, voxels_dir, renderings_dir):
+
+    def load_image(model_id, image_index):
       image_path = os.path.join(
-          renderings_dir, example_id, "rendering", "%02d.png" % image_index)
+          renderings_dir, model_id, "rendering", "%02d.png" % image_index)
       with tf.io.gfile.GFile(image_path, "rb") as fp:
         image = np.array(lazy_imports.PIL_Image.open(fp))  # pylint: disable=no-member
       # tfds image features can't have 4 channels.
@@ -245,30 +247,26 @@ class ShapenetR2n2(tfds.core.GeneratorBasedBuilder):
       image[background] = BACKGROUND_COLOR
       return image
 
-    def load_meta(example_id):
+    def load_meta(model_id):
       meta_path = os.path.join(
-          renderings_dir, example_id, "rendering", "rendering_metadata.txt")
+          renderings_dir, model_id, "rendering", "rendering_metadata.txt")
       with tf.io.gfile.GFile(meta_path, "rb") as fp:
         meta = np.loadtxt(fp)
       return meta.astype(np.float32)
 
-    def load_voxels(example_id):
-      binvox_path = os.path.join(voxels_dir, example_id, "model.binvox")
+    def load_voxels(model_id):
+      binvox_path = os.path.join(voxels_dir, model_id, "model.binvox")
       with tf.io.gfile.GFile(binvox_path, mode="rb") as fp:
         voxel = trimesh.load(fp, file_type='binvox')
-      encoding, padding = voxel.encoding.stripped
-      return dict(
-        stripped=encoding.dense,
-        padding=padding)
-      # return voxel.encoding.dense
+      return voxel.encoding.dense
 
-    for example_id in example_ids:
+    for model_id in model_ids:
       images = [
-          load_image(example_id, i) for i in range(RENDERINGS_PER_EXAMPLE)]
-      voxels = load_voxels(example_id)
-      meta = load_meta(example_id)
+          load_image(model_id, i) for i in range(RENDERINGS_PER_EXAMPLE)]
+      voxels = load_voxels(model_id)
+      meta = load_meta(model_id)
       yield dict(
         voxels=voxels,
         renderings=dict(image=images, meta=meta),
-        example_id=example_id,
+        model_id=model_id,
         synset_id=synset_id)

@@ -2,13 +2,14 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from absl import app
+from absl import flags
 import tensorflow as tf
 import tensorflow_datasets as tfds
 from shape_tfds.shape.shapenet.r2n2 import ShapenetR2n2Config
 from shape_tfds.shape.shapenet.r2n2 import synset_id
 
-tf.enable_eager_execution()
-flags = tf.flags
+tf.compat.v1.enable_eager_execution()
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string("synset", "telephone", "category name or id")
@@ -18,12 +19,10 @@ flags.DEFINE_integer("image_index", 0, "image index to use")
 
 
 def vis(image, voxels):
-  # visualize a single image/voxel pair
+  """visualize a single image/voxel pair."""
   import matplotlib.pyplot as plt
   # This import registers the 3D projection, but is otherwise unused.
   from mpl_toolkits.mplot3d import Axes3D
-
-  # and plot everything
   fig = plt.figure()
   ax = fig.gca()
   ax.imshow(image)
@@ -31,7 +30,6 @@ def vis(image, voxels):
   fig = plt.figure()
   ax = fig.gca(projection="3d")
   ax.voxels(voxels)
-  # ax.axis("square")
   plt.show()
 
 
@@ -48,4 +46,4 @@ def main(argv):
 
 
 if __name__ == "__main__":
-  tf.app.run()
+  app.run(main)

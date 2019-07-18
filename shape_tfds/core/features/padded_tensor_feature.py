@@ -8,9 +8,16 @@ from tensorflow_datasets.core.features import top_level_feature
 from shape_tfds.core import util
 
 
+def strip_zeros(example_data):
+    import trimesh
+    stripped, padding = trimesh.voxel.encoding.DenseEncoding(  # pylint: disable=unpacking-non-sequence
+        example_data).stripped
+    return dict(stripped=stripped.dense, padding=padding)
+
+
 class PaddedTensor(features.FeatureConnector):
   def __init__(
-      self, stripped_feature, pad_kwargs=None, strip_fn=None,
+      self, stripped_feature, pad_kwargs=None, strip_fn=strip_zeros,
       padded_shape=None):
     self._stripped = stripped_feature
     stripped_info = stripped_feature.get_tensor_info()
@@ -42,12 +49,12 @@ class PaddedTensor(features.FeatureConnector):
     return out
 
   def encode_example(self, example_data):
-    if self._strip_fn is not None:
+    if self._strip_fn is not None and isinstance(example_data, np.ndarray):
         example_data = self._strip_fn(example_data)
     return util.flatten_dicts(dict(
       stripped=self._stripped.encode_example(example_data['stripped']),
       padding=self._padding.encode_example(example_data['padding'])))
-  
+
   def get_serialized_info(self):
     return util.flatten_dicts(dict(
       stripped=self._stripped.get_serialized_info(),

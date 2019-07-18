@@ -11,7 +11,6 @@ class ZipSubdirResolver(trimesh.visual.resolvers.Resolver):
         assert(hasattr(archive, 'read'))
         self.archive = archive
         self.subdir = subdir
-        print(self.subdir)
 
     def get(self, name):
         name = name.lstrip()
