@@ -8,7 +8,7 @@
 git clone https://github.com/jackd/shape-tfds
 cd shape-tfds
 pip install -r requirements.txt
-pip install -e .
+pip install .
 ```
 
 ## Supported Datasets
@@ -42,8 +42,9 @@ Under heavy development. Expect untested functionality, bugs and breaking change
 
 TODO:
 
+* shapenet core: work out a better way to produce compound configs (zipped/concat)
 * add `PaddedTensor` tests
-* shapenet core
+* shapenet part
 * modelnet
 * [abc](https://deep-geometry.github.io/abc-dataset/)
 
