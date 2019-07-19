@@ -8,12 +8,15 @@ from shape_tfds.shape.shapenet import core
 tf.compat.v1.enable_eager_execution()
 
 ids, names = core.load_synset_ids()
-seed = 0
+seed_offset = 0
 synset_name = 'suitcase'
 # name = 'watercraft'
 # name = 'aeroplane'
 # name = 'table'
 # name = 'rifle'
+resolution = (128,)*2
+ny, nx = resolution
+
 
 
 def vis(image, voxels):
@@ -35,10 +38,13 @@ def vis(image, voxels):
 
 
 synset_id = ids[synset_name]
-mutator = core.SceneMutator(seed=seed, name='base%03d' % seed)
 
 configs = dict(
-    image=core.ShapenetCoreRenderConfig(synset_id, scene_mutator=mutator),
+    image=core.ShapenetCoreRenderConfig(
+        name='render-%s-%dx%d-%03d' % (synset_id, ny, nx, seed_offset),
+        synset_id=synset_id,
+        resolution=resolution,
+        view_fn=core.views.random_view_fn(seed_offset)),
     voxels=core.ShapenetCoreVoxelConfig(synset_id, resolution=32))
 builders = {k: core.ShapenetCore(config=config)
             for k, config in configs.items()}

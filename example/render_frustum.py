@@ -8,7 +8,8 @@ from shape_tfds.shape.shapenet import core
 tf.compat.v1.enable_eager_execution()
 
 ids, names = core.load_synset_ids()
-seed = 0
+resolution = 128
+seed_offset = 0
 synset_name = 'suitcase'
 # name = 'watercraft'
 # name = 'aeroplane'
@@ -16,12 +17,18 @@ synset_name = 'suitcase'
 # name = 'rifle'
 
 synset_id = ids[synset_name]
-mutator = core.SceneMutator(seed=seed, name='base%03d' % seed)
+nx = resolution
+ny = resolution
+view_fn = core.views.random_view_fn(seed_offset)
 
 configs = dict(
-    image=core.ShapenetCoreRenderConfig(synset_id, scene_mutator=mutator),
+    image=core.ShapenetCoreRenderConfig(
+        name='render-%s-%dx%d-%03d' % (synset_id, ny, nx, seed_offset),
+        synset_id=synset_id, resolution=(resolution,)*2, view_fn=view_fn),
     voxels=core.ShapenetCoreFrustumVoxelConfig(
-        synset_id, scene_mutator=mutator, resolution=128))
+        name='frustum_voxels-%s-%03d-%03d' % (
+            synset_id, resolution, seed_offset),
+        synset_id=synset_id, view_fn=view_fn, resolution=128))
 builders = {k: core.ShapenetCore(config=config)
             for k, config in configs.items()}
 for b in builders.values():

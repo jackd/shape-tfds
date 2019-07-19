@@ -17,20 +17,20 @@ import trimesh
 trimesh.util.log.setLevel('ERROR')
 
 
-def frustum_matrix(near, far, left, right, bottom, top):
-    # http://www.songho.ca/opengl/gl_projectionmatrix.html
-    return np.array([
-        [2 * near / (right - left), 0, (right + left) / (right - left), 0],
-        [0, 2*near / (top - bottom), (top + bottom) / (top - bottom), 0],
-        [0, 0, (far + near) / (near - far), -near * far / (far - near)],
-        [0, 0, -1, 0],
-    ])
+# def frustum_matrix(near, far, left, right, bottom, top):
+#     # http://www.songho.ca/opengl/gl_projectionmatrix.html
+#     return np.array([
+#         [2 * near / (right - left), 0, (right + left) / (right - left), 0],
+#         [0, 2*near / (top - bottom), (top + bottom) / (top - bottom), 0],
+#         [0, 0, (far + near) / (near - far), -near * far / (far - near)],
+#         [0, 0, -1, 0],
+#     ])
 
 
-def symmetric_frustum_matrix(near, far, width, height):
-    dx = width / 2
-    dy = height / 2
-    return frustum_matrix(near, far, -dx, dx, -dy, dy)
+# def symmetric_frustum_matrix(near, far, width, height):
+#     dx = width / 2
+#     dy = height / 2
+#     return frustum_matrix(near, far, -dx, dx, -dy, dy)
 
 
 class ShapenetCoreVoxelConfig(base.ShapenetCoreConfig):
@@ -54,7 +54,7 @@ class ShapenetCoreVoxelConfig(base.ShapenetCoreConfig):
     def loader(self, dl_manager=None):
         return base.mesh_loader_context(
             synset_id=self.synset_id, dl_manager=dl_manager,
-            map_fn=lambda scene: dict(
+            item_map_fn=lambda key, scene: dict(
                 voxels=load_voxels(scene, self._resolution).encoding.dense))
 
 

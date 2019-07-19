@@ -53,7 +53,7 @@ def mesh_loader(zipfile):
 
 
 @contextlib.contextmanager
-def mesh_loader_context(synset_id, dl_manager=None, map_fn=None):
+def mesh_loader_context(synset_id, dl_manager=None, item_map_fn=None):
     """
     Get a mesh loading context.
 
@@ -73,7 +73,10 @@ def mesh_loader_context(synset_id, dl_manager=None, map_fn=None):
     zip_path = get_obj_zip_path(synset_id, dl_manager)
     try:
         fp = tf.io.gfile.GFile(zip_path, "rb")
-        yield mesh_loader(zipfile.ZipFile(fp)).map(map_fn)
+        loader = mesh_loader(zipfile.ZipFile(fp))
+        if item_map_fn is not None:
+            loader = loader.item_map(item_map_fn)
+        yield loader
     finally:
         fp.close()
 
@@ -118,8 +121,7 @@ class ShapenetCoreConfig(tfds.core.BuilderConfig):
         ```
 
         Args:
-            zip_path: zipfile with models at SYNSET_ID/model_id/model.obj
-            model_id: id of the model.
+            dl_manager: DownloadManager
 
         Returns:
             context manager with `__enter__` returning a mapping from

@@ -10,6 +10,7 @@ import six
 import tensorflow as tf
 import tensorflow_datasets as tfds
 from tensorflow_datasets.core import features
+# from tensorflow_datasets.core.features import feature as feature_lib
 # from tensorflow_datasets.core.features import top_level_feature
 from shape_tfds.core.features.run_length_encoded_feature import rle as tf_impl
 from trimesh.voxel import runlength as np_impl
@@ -35,10 +36,10 @@ class RunLengthEncodedFeatureBase(features.FeatureConnector):
     self._dtype = dtype
 
   def get_serialized_info(self):
-    return tfds.features.TensorInfo(shape=(None,), dtype=self._encoded_dtype)
+    return features.TensorInfo(shape=(None,), dtype=self._encoded_dtype)
 
   def get_tensor_info(self):
-    return tfds.features.TensorInfo(shape=(self._size,), dtype=self._dtype)
+    return features.TensorInfo(shape=(self._size,), dtype=self._dtype)
 
   def _shaped(self, decoded):
     if self._size is not None:
