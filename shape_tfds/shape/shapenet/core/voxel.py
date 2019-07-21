@@ -10,27 +10,10 @@ import tensorflow_datasets as tfds
 from shape_tfds.shape.shapenet.core import base
 from shape_tfds.core.resolver import ZipSubdirResolver
 from shape_tfds.shape.shapenet.core.views import fix_axes
-from shape_tfds.core.features import PaddedTensor
-from shape_tfds.core.features import BinaryRunLengthEncodedFeature
+from shape_tfds.core.features import BinaryVoxel
 import trimesh
 
 trimesh.util.log.setLevel('ERROR')
-
-
-# def frustum_matrix(near, far, left, right, bottom, top):
-#     # http://www.songho.ca/opengl/gl_projectionmatrix.html
-#     return np.array([
-#         [2 * near / (right - left), 0, (right + left) / (right - left), 0],
-#         [0, 2*near / (top - bottom), (top + bottom) / (top - bottom), 0],
-#         [0, 0, (far + near) / (near - far), -near * far / (far - near)],
-#         [0, 0, -1, 0],
-#     ])
-
-
-# def symmetric_frustum_matrix(near, far, width, height):
-#     dx = width / 2
-#     dy = height / 2
-#     return frustum_matrix(near, far, -dx, dx, -dy, dy)
 
 
 class ShapenetCoreVoxelConfig(base.ShapenetCoreConfig):
@@ -47,9 +30,7 @@ class ShapenetCoreVoxelConfig(base.ShapenetCoreConfig):
         return self._synset_id
 
     def features(self):
-        import shape_tfds as sds
-        return dict(
-            voxels=sds.core.features.BinaryVoxel(shape=(self._resolution,)*3))
+        return dict(voxels=BinaryVoxel(shape=(self._resolution,)*3))
 
     def loader(self, dl_manager=None):
         return base.mesh_loader_context(

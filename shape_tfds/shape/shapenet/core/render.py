@@ -15,34 +15,46 @@ import trimesh
 from shape_tfds.shape.shapenet.core import base
 from shape_tfds.core.resolver import ZipSubdirResolver
 from shape_tfds.shape.shapenet.core import views
+import tensorflow_datasets as tfds
 
 
-class ShapenetCoreRenderConfig(base.ShapenetCoreConfig):
-    def __init__(self, name, synset_id, view_fn, resolution=(128, 128)):
-        self._synset_id = synset_id
-        self._view_fn = view_fn
+class ShapenetCoreRenderingsConfig(tfds.core.BuilderConfig):
+    def __init__(self, synset_id, resolution=(128, 128), seed=0, **kwargs):
         self._resolution = resolution
-        super(ShapenetCoreRenderConfig, self).__init__(
+        self._seed = seed
+        self._synset_id = synset_id
+        ny, nx = resolution
+        name = 'renderings-%d-%d-%s-%d' % (ny, nx, synset_id, seed)
+        super(ShapenetCoreRenderingsConfig, self).__init__(
             name=name,
             description='shapenet core renderings',
             version=tfds.core.Version("0.0.1"))
-
-    def features(self):
-        return dict(image=tfds.core.features.Image(shape=self.resolution+(3,)))
-
-    @property
-    def synset_id(self):
-        return self._synset_id
 
     @property
     def resolution(self):
         return self._resolution
 
-    def loader(self, dl_manager=None):
+    @property
+    def seed(self):
+        return self._seed
+
+    @property
+    def synset_id(self):
+        return self._synset_id
+
+
+class ShapenetCoreRenderings(base.ShapenetCore):
+    @property
+    def _features(self):
+        return dict(image=tfds.core.features.Image(
+            shape=self.builder_config.resolution+(3,)))
+
+    def loader_conext(self, dl_manager=None):
+        view_fn = views.random_view_fn(self.builder_config.seed)
         return base.mesh_loader_context(
             synset_id=self.synset_id, dl_manager=dl_manager,
             item_map_fn=lambda key, scene: dict(image=render(
-                scene, self._resolution, **self._view_fn(key))))
+                scene, self._resolution, **view_fn(key))))
 
 
 def render(scene, resolution, position, focal):
@@ -71,12 +83,8 @@ if __name__ == '__main__':
     synset_id = ids[synset_name]
 
     resolution = (128, 128)
-    nx, ny = resolution
-    config = ShapenetCoreRenderConfig(
-        name='render-%s-%dx%d-%03d' % (synset_id, ny, nx, seed_offset),
-        view_fn=views.random_view_fn(seed_offset),
-        synset_id=synset_id)
-    builder = base.ShapenetCore(config=config)
+    builder = ShapenetCoreRenderings(config=ShapenetCoreRenderingsConfig(
+        synset_id=synset_id, resolution=resolution, seed=seed_offset))
     builder.download_and_prepare(download_config=download_config)
 
     dataset = builder.as_dataset(split='train')

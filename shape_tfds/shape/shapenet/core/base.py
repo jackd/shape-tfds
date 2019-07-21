@@ -52,7 +52,24 @@ def mesh_loader(zipfile):
     return Mapping.mapped(keys, load_fn)
 
 
-@contextlib.contextmanager
+class MeshLoaderContext(object):
+    def __init__(self, path, map_fn=None):
+        self._path = path
+        self._fp = None
+        self._map_fn = map_fn
+
+    def __enter__(self):
+        self._fp = tf.io.gfile.GFile(self._path, "rb")
+        loader = mesh_loader(zipfile.ZipFile(self._fp))
+        if self._map_fn is not None:
+            loader = loader.map(self._map_fn)
+        return loader
+
+    def __exit__(self, *args, **kwargs):
+        self._fp.close()
+        self._fp = None
+
+
 def mesh_loader_context(synset_id, dl_manager=None, item_map_fn=None):
     """
     Get a mesh loading context.
@@ -61,8 +78,8 @@ def mesh_loader_context(synset_id, dl_manager=None, item_map_fn=None):
 
     Example usage:
     ```python
-    loader = mapped_mesh_loader_context(synset_id)
-    with loader:
+    loader_context = mesh_loader_context(synset_id)
+    with loader_context as loader:
         # possible download starts
         for key in loader:
             print(key)
@@ -70,65 +87,7 @@ def mesh_loader_context(synset_id, dl_manager=None, item_map_fn=None):
             scene.show()
     ```
     """
-    zip_path = get_obj_zip_path(synset_id, dl_manager)
-    try:
-        fp = tf.io.gfile.GFile(zip_path, "rb")
-        loader = mesh_loader(zipfile.ZipFile(fp))
-        if item_map_fn is not None:
-            loader = loader.item_map(item_map_fn)
-        yield loader
-    finally:
-        fp.close()
-
-
-class ShapenetCoreConfig(tfds.core.BuilderConfig):
-    def obj_path(self, model_id):
-        """path of obj files in shapenet core zip files."""
-        return os.path.join(self.synset_id, model_id, 'model.obj')
-
-    @abc.abstractproperty
-    def synset_id(self):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def features(self):
-        """python dict of features. Should not contain model_id."""
-        raise NotImplementedError
-
-    def supervised_keys(self):
-        return None
-
-    @abc.abstractmethod
-    def loader(self, dl_manager=None):
-        """
-        Get a loading context manager.
-
-        Loaded example data should be encodable by `self.features()`.
-
-        Example usage:
-        ```python
-        with config.loader(dl_manager) as loader:
-            for model_id in model_ids:
-                example_data = loader[model_id]
-        ```
-
-        Example implementation:
-        ```python
-        def loader(self, dl_manager):
-            zip_path = get_obj_zip_path(
-                synset_id=self.synset_id, dl_manager=dl_manager)
-            return mesh_loader_context(zip_path, map_fn=custom_map_fn)
-        ```
-
-        Args:
-            dl_manager: DownloadManager
-
-        Returns:
-            context manager with `__enter__` returning a mapping from
-            `model_id -> example_data`, where `example_data` is a mapping and
-            `example_data[k]` is encodable by `self.features()[k]`.
-        """
-        raise NotImplementedError
+    return MeshLoaderContext(get_obj_zip_path(synset_id, dl_manager))
 
 
 def load_synset_ids():
@@ -181,49 +140,6 @@ def _load_splits_ids(path):
     return split_dicts
 
 
-class ShapenetCore(tfds.core.GeneratorBasedBuilder):
-    BUILDER_CONFIGS = []
-
-    def _info(self):
-        features = self.builder_config.features()
-        features['model_id'] = tfds.core.features.Text()
-        return tfds.core.DatasetInfo(
-            builder=self,
-            features=tfds.core.features.FeaturesDict(features),
-            citation=SHAPENET_CITATION,
-            supervised_keys=self.builder_config.supervised_keys(),
-            urls=[SHAPENET_URL],
-        )
-
-    def _split_generators(self, dl_manager):
-        config = self.builder_config
-        synset_id = config.synset_id
-        model_ids = load_split_ids(dl_manager)[synset_id]
-        splits = sorted(model_ids.keys())
-        loader_fn = functools.partial(
-            config.loader, dl_manager=dl_manager)
-
-        return [tfds.core.SplitGenerator(
-            name=split, num_shards=len(model_ids[split]) // 1000 + 2,
-            gen_kwargs=dict(
-                loader_fn=loader_fn, model_ids=model_ids[split]))
-                for split in splits]
-
-    def _generate_examples(self, **kwargs):
-        gen = self._generate_example_data(**kwargs)
-        return (
-            ((v['model_id'], v) for v in gen)
-            if self.version.implements(tfds.core.Experiment.S3) else gen)
-
-    def _generate_example_data(self, loader_fn, model_ids):
-        with loader_fn() as loader:
-            for model_id in model_ids:
-                example_data = loader[model_id]
-                assert('model_id' not in example_data)
-                example_data['model_id'] = model_id
-                yield example_data
-
-
 def _dl_manager():
     return tfds.core.download.DownloadManager(
         download_dir=os.path.join(tfds.core.constants.DATA_DIR, 'downloads'))
@@ -243,3 +159,57 @@ def get_obj_zip_path(synset_id, dl_manager=None):
     """Get path of zip file containing obj files."""
     dl_manager = dl_manager or _dl_manager()
     return dl_manager.download(DL_URL.format(synset_id=synset_id))
+
+
+class ShapenetCore(tfds.core.GeneratorBasedBuilder):
+    @abc.abstractmethod
+    def loader_context(self, dl_manager=None):
+        raise NotImplementedError
+
+    @abc.abstractproperty
+    def _features(self):
+        """dict of features, excluding model_id."""
+        raise NotImplementedError
+
+    @property
+    def _supervised_keys(self):
+        return None
+
+    def _info(self):
+        features = self._features
+        features['model_id'] = tfds.core.features.Text()
+        return tfds.core.DatasetInfo(
+            builder=self,
+            features=tfds.core.features.FeaturesDict(features),
+            citation=SHAPENET_CITATION,
+            supervised_keys=self._supervised_keys,
+            urls=[SHAPENET_URL],
+        )
+
+    def _split_generators(self, dl_manager):
+        config = self.builder_config
+        synset_id = config.synset_id
+        model_ids = load_split_ids(dl_manager)[synset_id]
+        splits = sorted(model_ids.keys())
+        loader_context = self.loader_context(dl_manager=dl_manager)
+
+        return [tfds.core.SplitGenerator(
+            name=split, num_shards=len(model_ids[split]) // 500 + 1,
+            gen_kwargs=dict(
+                loader_context=loader_context, model_ids=model_ids[split]))
+                for split in splits]
+
+    def _generate_examples(self, **kwargs):
+        gen = self._generate_example_data(**kwargs)
+        return (
+            ((v['model_id'], v) for v in gen)
+            if self.version.implements(tfds.core.Experiment.S3) else gen)
+
+    def _generate_example_data(self, loader_context, model_ids):
+        with loader_context as loader:
+            for model_id in model_ids:
+                example_data = loader(model_id)
+                if example_data is not None:
+                    assert('model_id' not in example_data)
+                    example_data['model_id'] = model_id
+                    yield example_data

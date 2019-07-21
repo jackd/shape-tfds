@@ -10,7 +10,7 @@ import tensorflow_datasets as tfds
 import shape_tfds as sds
 from shape_tfds.shape.shapenet.core import base
 from shape_tfds.core.resolver import ZipSubdirResolver
-from shape_tfds.core.features import BinaryRunLengthEncodedFeature
+from shape_tfds.core.features import BinaryVoxel
 from shape_tfds.shape.shapenet.core import views
 from shape_tfds.shape.shapenet.core.voxel import load_voxels
 import trimesh
@@ -49,8 +49,7 @@ class ShapenetCoreFrustumVoxelConfig(base.ShapenetCoreConfig):
         return self._synset_id
 
     def features(self):
-        return dict(
-            voxels=sds.core.features.BinaryVoxel((self._resolution,)*3))
+        return dict(voxels=BinaryVoxel((self._resolution,)*3))
 
     def loader(self, dl_manager=None):
         return base.mesh_loader_context(
