@@ -8,7 +8,7 @@ from shape_tfds.shape.shapenet import core
 tf.compat.v1.enable_eager_execution()
 
 ids, names = core.load_synset_ids()
-resolution = 128
+resolution = 256
 seed_offset = 0
 synset_name = 'suitcase'
 # name = 'watercraft'
@@ -22,13 +22,10 @@ ny = resolution
 view_fn = core.views.random_view_fn(seed_offset)
 
 configs = dict(
-    image=core.ShapenetCoreRenderConfig(
-        name='render-%s-%dx%d-%03d' % (synset_id, ny, nx, seed_offset),
-        synset_id=synset_id, resolution=(resolution,)*2, view_fn=view_fn),
+    image=core.ShapenetCoreRenderingsConfig(
+        synset_id=synset_id, resolution=(resolution,)*2, seed=seed_offset),
     voxels=core.ShapenetCoreFrustumVoxelConfig(
-        name='frustum_voxels-%s-%03d-%03d' % (
-            synset_id, resolution, seed_offset),
-        synset_id=synset_id, view_fn=view_fn, resolution=128))
+        synset_id=synset_id, resolution=resolution, seed=seed_offset))
 builders = {k: core.ShapenetCore(config=config)
             for k, config in configs.items()}
 for b in builders.values():

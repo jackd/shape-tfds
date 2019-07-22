@@ -52,21 +52,28 @@ def mesh_loader(zipfile):
     return Mapping.mapped(keys, load_fn)
 
 
-class MeshLoaderContext(object):
-    def __init__(self, path, map_fn=None):
+class MappedFileContext(object):
+    def __init__(self, path, map_fn, on_open=None, on_close=None, mode='rb'):
         self._path = path
-        self._fp = None
         self._map_fn = map_fn
+        self._mode = mode
+        self._fp = None
+        self._args = None
+        self._on_open = on_open
+        self._on_close = on_close
 
     def __enter__(self):
-        self._fp = tf.io.gfile.GFile(self._path, "rb")
-        loader = mesh_loader(zipfile.ZipFile(self._fp))
-        if self._map_fn is not None:
-            loader = loader.map(self._map_fn)
-        return loader
+        self._fp = tf.io.gfile.GFile(self._path, mode=self._mode)
+        out, self._arg = self._map_fn(self._fp)
+        if self._on_open is not None:
+            self._on_open(self._arg)
+        return out
 
     def __exit__(self, *args, **kwargs):
+        if self._on_close is not None:
+            self._on_close(self._arg)
         self._fp.close()
+        self._mapped = None
         self._fp = None
 
 
@@ -87,7 +94,14 @@ def mesh_loader_context(synset_id, dl_manager=None, item_map_fn=None):
             scene.show()
     ```
     """
-    return MeshLoaderContext(get_obj_zip_path(synset_id, dl_manager))
+    def file_map_fn(fp):
+        loader = mesh_loader(zipfile.ZipFile(fp))
+        if item_map_fn is not None:
+            loader = loader.item_map(item_map_fn)
+        return loader, None
+
+    return MappedFileContext(
+        get_obj_zip_path(synset_id, dl_manager), map_fn=file_map_fn)
 
 
 def load_synset_ids():
@@ -161,28 +175,90 @@ def get_obj_zip_path(synset_id, dl_manager=None):
     return dl_manager.download(DL_URL.format(synset_id=synset_id))
 
 
-class ShapenetCore(tfds.core.GeneratorBasedBuilder):
+class ShapenetCoreConfig(tfds.core.BuilderConfig):
+    def __init__(self, synset_id, **kwargs):
+        self._synset_id = synset_id
+        super(ShapenetCoreConfig, self).__init__(**kwargs)
+
+    @property
+    def synset_id(self):
+        return self._synset_id
+
+    @property
+    def supervised_keys(self):
+        return None
+
+    @abc.abstractproperty
+    def features(self):
+        """dict of features (not including 'model_id')."""
+        raise NotImplementedError
+
     @abc.abstractmethod
     def loader_context(self, dl_manager=None):
         raise NotImplementedError
 
-    @abc.abstractproperty
-    def _features(self):
-        """dict of features, excluding model_id."""
-        raise NotImplementedError
 
-    @property
-    def _supervised_keys(self):
-        return None
+def get_data_mapping_context(
+        config, data_dir=None, dl_manager=None, overwrite=False,
+        item_map_fn=None):
+    import h5py
+    from shape_tfds.core import mapping
+    import tqdm
+    if data_dir is None:
+        data_dir = os.path.join(
+            tfds.core.constants.DATA_DIR, 'shapenet_core',
+            'mappings', config.name, str(config.version))
+    data_dir = os.path.expanduser(data_dir)
+    if not tf.io.gfile.isdir(data_dir):
+        tf.io.gfile.makedirs(data_dir)
+    path = os.path.join(data_dir, 'mapping.h5')
 
+    def file_map_fn(fp, mode='r'):
+        h5 = h5py.File(fp, mode=mode)
+        feature = tfds.core.features.FeaturesDict(config.features)
+        feature._set_top_level()
+        feature_mapping = mapping.FeatureMapping(
+            feature, mapping.H5Mapping(h5))
+        if item_map_fn is not None:
+            from collection_utils.mapping import ItemMappedMapping
+            return (
+                ItemMappedMapping(feature_mapping, item_map_fn),
+                feature_mapping)
+        else:
+            return feature_mapping, feature_mapping
+
+    if not tf.io.gfile.exists(path) or overwrite:
+        try:
+            with h5py.File(path, 'w') as h5:
+                feature = tfds.core.features.FeaturesDict(config.features)
+                feature._set_top_level()
+                dst = mapping.FeatureMapping(feature, mapping.H5Mapping(h5))
+                with config.loader_context(dl_manager) as src:
+                    for k, v in tqdm.tqdm(
+                            src.items(),
+                            total=len(src),
+                            desc='Creating data mapping for %s' % config.name):
+                        dst[k] = v
+        except (Exception, KeyboardInterrupt):
+            if tf.io.gfile.exists(path):
+                tf.io.gfile.remove(path)
+            raise
+
+    return MappedFileContext(
+        path, file_map_fn,
+        on_open=lambda loader: loader.open(),
+        on_close=lambda loader: loader.close())
+
+
+class ShapenetCore(tfds.core.GeneratorBasedBuilder):
     def _info(self):
-        features = self._features
+        features = self.builder_config.features
         features['model_id'] = tfds.core.features.Text()
         return tfds.core.DatasetInfo(
             builder=self,
             features=tfds.core.features.FeaturesDict(features),
             citation=SHAPENET_CITATION,
-            supervised_keys=self._supervised_keys,
+            supervised_keys=self.builder_config.supervised_keys,
             urls=[SHAPENET_URL],
         )
 
@@ -191,7 +267,7 @@ class ShapenetCore(tfds.core.GeneratorBasedBuilder):
         synset_id = config.synset_id
         model_ids = load_split_ids(dl_manager)[synset_id]
         splits = sorted(model_ids.keys())
-        loader_context = self.loader_context(dl_manager=dl_manager)
+        loader_context = config.loader_context(dl_manager=dl_manager)
 
         return [tfds.core.SplitGenerator(
             name=split, num_shards=len(model_ids[split]) // 500 + 1,
@@ -201,14 +277,17 @@ class ShapenetCore(tfds.core.GeneratorBasedBuilder):
 
     def _generate_examples(self, **kwargs):
         gen = self._generate_example_data(**kwargs)
-        return (
-            ((v['model_id'], v) for v in gen)
-            if self.version.implements(tfds.core.Experiment.S3) else gen)
+        if (
+                hasattr(self.version, 'implements') and
+                self.version.implements(tfds.core.Experiment.S3)):
+            return ((v['model_id'], v) for v in gen)
+        else:
+            return gen
 
     def _generate_example_data(self, loader_context, model_ids):
         with loader_context as loader:
             for model_id in model_ids:
-                example_data = loader(model_id)
+                example_data = loader[model_id]
                 if example_data is not None:
                     assert('model_id' not in example_data)
                     example_data['model_id'] = model_id

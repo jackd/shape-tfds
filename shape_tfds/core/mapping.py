@@ -8,7 +8,6 @@ import numpy as np
 import tensorflow as tf
 import h5py
 
-
 class DirectoryMapping(collections.Mapping):
     def __init__(self, root_dir):
         self._root_dir = root_dir
@@ -120,6 +119,77 @@ class H5Mapping(collections.Mapping):
         del self._root[key]
 
 
+def flatten_dict(nested_dict):
+    out = {}
+    for k, v in nested_dict.items():
+        if hasattr(v, 'items'):
+            for k2, v2 in flatten_dict(v).items():
+                out[os.path.join(k, k2)] = v2
+        else:
+            out[k] = v
+    return out
+
+
+def nest_dict(flat_dict):
+    out = {}
+    for k, v in flat_dict.items():
+        split_k = k.split('/')
+        if len(split_k) == 1:
+            out[k] = v
+        else:
+            curr = out
+            for subk in split_k[:-1]:
+                curr = curr.setdefault(subk, {})
+            curr[split_k[-1]] = v
+    return out
+
+
+class FeatureDecoder(object):
+    def __init__(self, feature):
+        self._feature = feature
+        self._sess = None
+
+    def __enter__(self):
+        self.open()
+        return self
+
+    def __exit__(self, *args, **kwargs):
+        self.close()
+
+    def open(self):
+        if self._sess is not None:
+            raise RuntimeError('Cannot open DecoderContext: already open')
+        graph = tf.compat.v1.Graph()
+        with graph.as_default():  # pylint: disable=not-context-manager
+            with tf.device('/cpu:0'):
+                self._components = {
+                    k: tf.compat.v1.placeholder(
+                        name=k, dtype=v.dtype, shape=v.shape)
+                    for k, v in
+                    flatten_dict(self._feature.get_serialized_info()).items()}
+                self._decoded = self._feature.decode_example(
+                    nest_dict(self._components))
+
+        self._sess = tf.compat.v1.Session(graph=graph)
+
+    def close(self):
+        if self._sess is None:
+            raise RuntimeError('Cannot close DecoderContext: already closed')
+        self._sess.close()
+        self._sess = None
+
+    def __call__(self, serialized_values):
+        feed_dict = {
+            self._components[k]: v for k, v in serialized_values.items()}
+        try:
+            return self._sess.run(self._decoded, feed_dict=feed_dict)
+        except Exception:
+            np.save('/tmp/brle.npy', serialized_values['voxels/stripped/base'])
+            raise RuntimeError(
+                'Error computing decoding with values %s'
+                % str(serialized_values))
+
+
 class FeatureMapping(collections.Mapping):
     """
     Class for mapping Feature data to a component mapping.
@@ -150,50 +220,42 @@ class FeatureMapping(collections.Mapping):
         """
         self._component_mapping = component_mapping
         self._feature = feature
-        self._flat_features = feature._flatten(feature)
-        for k in self._flat_features:
-            self._first_key = k
-            break
-        self._sess = None
+        self._serialized_info = feature.get_serialized_info()
+        self._decoder = FeatureDecoder(feature)
+        self._flat_info = flatten_dict(self._serialized_info)
+        self._flat_keys = tuple(sorted(self._flat_info))
 
     def __enter__(self):
-        graph = tf.compat.v1.Graph()
-        with graph.as_default():  # pylint: disable=not-context-manager
-            with tf.device('/cpu:0'):
-                components = {
-                    k: tf.compat.v1.placeholder(
-                        name=k, dtype=v.dtype, shape=v.shape)
-                    for k, v in self._feature.items()}
-                self._decoded = self._feature.decode_example(components)
-
-        self._sess = tf.compat.v1.Session(graph=graph)
+        self.open()
         return self
 
     def __exit__(self, *args, **kwargs):
-        self._sess.close()
-        self._sess = None
+        self.close()
+
+    def open(self):
+        self._decoder.open()
+
+    def close(self):
+        self._decoder.close()
 
     def __getitem__(self, key):
-        if self._sess is None:
-            raise RuntimeError('FeatureMaping closed')
-        components = self._feature._nest(
-            {k: self._component_mapping[os.path.join(key, k)]
-            for k in self._flat_features})
-        return self._sess.run(self._decoded, feed_dict=components)
+        components = {k: self._component_mapping[os.path.join(key, k)]
+                      for k in self._flat_keys}
+        return self._decoder(components)
 
     def __setitem__(self, key, value):
-        for k, v in self._feature._flatten(
-                self._feature.encode_example(value)).items():
+        value = self._feature.encode_example(value)
+        for k, v in flatten_dict(value).items():
             self._component_mapping[os.path.join(key, k)] = v
 
     def keys(self):
-        split_keys = (k.split('/') for k in self._component_mapping.keys())
-        return (
-            os.path.join(ks[:-1]) for ks in split_keys
-            if ks[-1] == self._first_key)
+        return set(k.split('/')[0] for k in self._component_mapping.keys())
 
     def __iter__(self):
         return iter(self.keys())
 
     def __contains__(self, key):
-        return os.path.join(key, self._first_key) in self._component_mapping
+        return os.path.join(key, self._flat_keys[0]) in self._component_mapping
+
+    def __len__(self):
+        return sum(1 for _ in self.keys())

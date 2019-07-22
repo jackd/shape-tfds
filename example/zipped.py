@@ -40,8 +40,7 @@ def vis(image, voxels):
 synset_id = ids[synset_name]
 
 configs = dict(
-    image=core.ShapenetCoreRenderConfig(
-        name='render-%s-%dx%d-%03d' % (synset_id, ny, nx, seed_offset),
+    image=core.ShapenetCoreRenderingsConfig(
         synset_id=synset_id,
         resolution=resolution,
         view_fn=core.views.random_view_fn(seed_offset)),

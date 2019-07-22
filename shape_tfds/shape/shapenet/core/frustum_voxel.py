@@ -9,10 +9,9 @@ import numpy as np
 import tensorflow_datasets as tfds
 import shape_tfds as sds
 from shape_tfds.shape.shapenet.core import base
-from shape_tfds.core.resolver import ZipSubdirResolver
 from shape_tfds.core.features import BinaryVoxel
 from shape_tfds.shape.shapenet.core import views
-from shape_tfds.shape.shapenet.core.voxel import load_voxels
+from shape_tfds.shape.shapenet.core import voxel as voxel_lib
 import trimesh
 
 trimesh.util.log.setLevel('ERROR')
@@ -34,68 +33,73 @@ trimesh.util.log.setLevel('ERROR')
 #     return frustum_matrix(near, far, -dx, dx, -dy, dy)
 
 
+def _get_voxel_transform(resolution):
+    diag = 1 / (resolution - 1)
+    return np.array([
+        [diag, 0, 0, -0.5],
+        [0, diag, 0, -0.5],
+        [0, 0, diag, -0.5],
+        [0, 0, 0, 1]
+    ])
+
+
+
 class ShapenetCoreFrustumVoxelConfig(base.ShapenetCoreConfig):
-    def __init__(self, name, synset_id, view_fn, resolution=64):
-        self._view_fn = view_fn
-        self._synset_id = synset_id
+    def __init__(self, synset_id, resolution=64, seed=0):
+        self._seed = seed
         self._resolution = resolution
         super(ShapenetCoreFrustumVoxelConfig, self).__init__(
-            name=name,
+            synset_id=synset_id,
+            name='frustum_voxels-%d-%s-%d' % (resolution, synset_id, seed),
             description='shapenet core frustum voxels',
             version=tfds.core.Version("0.0.1"))
 
     @property
-    def synset_id(self):
-        return self._synset_id
-
     def features(self):
         return dict(voxels=BinaryVoxel((self._resolution,)*3))
 
-    def loader(self, dl_manager=None):
-        return base.mesh_loader_context(
-            synset_id=self.synset_id, dl_manager=dl_manager,
-            item_map_fn=lambda key, scene: dict(
-                voxels=load_frustum_voxels_dense(
-                    scene, self._resolution, **self._view_fn(key))))
+    @property
+    def resolution(self):
+        return self._resolution
+
+    def loader_context(self, dl_manager=None):
+        view_fn = views.random_view_fn(seed_offset=self._seed)
+        transform = _get_voxel_transform(self._resolution)
+
+        def item_map_fn(key, data):
+            voxels = trimesh.voxel.VoxelGrid(
+                data['voxels'], transform=transform)
+            scene = trimesh.primitives.Sphere().scene()
+            return dict(voxels=transform_voxels(
+                scene, voxels,
+                self._resolution, **view_fn(key)))
+
+        return base.get_data_mapping_context(
+            config=voxel_lib.ShapenetCoreVoxelConfig(
+                synset_id=self.synset_id, resolution=self.resolution),
+            dl_manager=dl_manager, item_map_fn=item_map_fn)
+
+        # return base.mesh_loader_context(
+        #     synset_id=self.synset_id, dl_manager=dl_manager,
+        #     item_map_fn=lambda key, scene: dict(
+        #         voxels=load_frustum_voxels_dense(
+        #             scene, self._resolution, **view_fn(key))))
 
 
-def load_frustum_voxels_dense(scene, resolution, position, focal):
-    vox = load_voxels(scene, resolution)
+def transform_voxels(scene, voxels, resolution, position, focal):
     views.set_scene_view(scene, (resolution,)*2, position, focal)
-
     dist = np.linalg.norm(position)
-
     origin, rays = scene.camera_rays()
     rays = rays.reshape((resolution, resolution, 3))
     z = np.linspace(dist - 0.5, dist + 0.5, resolution)
     coords = np.expand_dims(rays, axis=-2) * np.expand_dims(z, axis=-1)
     coords += origin
 
-    frust_vox_dense = vox.is_filled(coords)
+    frust_vox_dense = voxels.is_filled(coords)
     frust_vox_dense = frust_vox_dense.transpose((1, 0, 2))  # y, x, z  # pylint: disable=no-member
     return frust_vox_dense
 
 
-if __name__ == '__main__':
-    ids, names = base.load_synset_ids()
-
-    synset_name = 'suitcase'
-    # name = 'watercraft'
-    # name = 'aeroplane'
-    # name = 'table'
-    # name = 'rifle'
-
-
-    seed_offset = 0
-    synset_id = ids[synset_name]
-    resolution = 64
-
-    config = ShapenetCoreFrustumVoxelConfig(
-        name='frustum_voxels-%s-%03d-%03d' % (
-            synset_id, resolution, seed_offset),
-        synset_id=synset_id,
-        view_fn=views.random_view_fn(seed_offset),
-        resolution=resolution)
-
-    builder = base.ShapenetCore(config=config)
-    builder.download_and_prepare()
+def load_frustum_voxels_dense(scene, resolution, position, focal):
+    vox = voxel_lib.scene_to_voxels(scene, resolution)
+    return transform_voxels(scene, vox, resolution, position, focal)

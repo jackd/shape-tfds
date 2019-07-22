@@ -104,7 +104,7 @@ def random_view_fn(seed_offset=0, **kwargs):
     Get a mapping from given keys to a dict with 'position', 'focal' keys.
 
     The mapping is deterministic but random, with a new random state used with
-    seed given by `(hash(key) + seed_offset) % 2**32`.
+    seed given by `(zlib.adler32(key) + seed_offset) % (2 ** 32)`.
 
     Args:
         keys: iterable of keys in the returned Mapping
@@ -116,13 +116,22 @@ def random_view_fn(seed_offset=0, **kwargs):
             raise ValueError('Invalid kwarg key "%s"' % key)
 
     def get_views(key, num_views=None):
+        import zlib
+        seed = (zlib.adler32(str.encode(key)) + seed_offset) % (2 ** 32)
         return get_random_views(
-            random=np.random.RandomState(  # pylint: disable=no-member,
-                (hash(key) + seed_offset) % (2 ** 32)),
+            random=np.random.RandomState(seed),  # pylint: disable=no-member
             num_views=None,
             **kwargs)
 
     return get_views
+
+
+# def get_scene(resolution, position, focal):
+#     from trimesh import scene
+#     camera = scene.cameras.Camera(
+#         resolution=resolution, focal=focal*resolution)
+#     return scene.Scene(
+#         camera=camera, camera_transform=transformations.look_at(position))
 
 
 def set_scene_view(scene, resolution, position, focal):

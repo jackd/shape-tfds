@@ -17,26 +17,42 @@ trimesh.util.log.setLevel('ERROR')
 
 
 class ShapenetCoreVoxelConfig(base.ShapenetCoreConfig):
-    def __init__(self, synset_id, resolution=64):
-        self._synset_id = synset_id
+    def __init__(self, synset_id, resolution=64, from_file_mapping=False):
         self._resolution = resolution
+        self._from_file_mapping = from_file_mapping
         super(ShapenetCoreVoxelConfig, self).__init__(
             name='voxel-%s-%d' % (synset_id, resolution),
             description='shapenet core voxels',
-            version=tfds.core.Version("0.0.1"))
+            version=tfds.core.Version("0.0.1"),
+            synset_id=synset_id)
 
     @property
-    def synset_id(self):
-        return self._synset_id
-
     def features(self):
         return dict(voxels=BinaryVoxel(shape=(self._resolution,)*3))
 
-    def loader(self, dl_manager=None):
+    @property
+    def resolution(self):
+        return self._resolution
+
+
+    def base_loader_context(self, dl_manager=None):
         return base.mesh_loader_context(
             synset_id=self.synset_id, dl_manager=dl_manager,
             item_map_fn=lambda key, scene: dict(
-                voxels=load_voxels(scene, self._resolution).encoding.dense))
+                voxels=scene_to_voxels(
+                    scene, self._resolution).encoding.dense))
+
+    def mapping_loader_context(self, dl_manager=None):
+        return base.get_data_mapping_context(
+            config=ShapenetCoreVoxelConfig(
+                synset_id=self.synset_id, resolution=self.resolution,
+                from_file_mapping=False),
+            dl_manager=dl_manager)
+
+    def loader_context(self, dl_manager):
+        return (
+            self.mapping_loader_context if self._from_file_mapping else
+            self.base_loader_context)(dl_manager)
 
 
 def as_mesh(scene_or_mesh):
@@ -49,7 +65,8 @@ def as_mesh(scene_or_mesh):
     return mesh
 
 
-def voxelize_binvox(mesh, pitch=None, dimension=None, bounds=None, **binvoxer_kwargs):
+def voxelize_binvox(
+        mesh, pitch=None, dimension=None, bounds=None, **binvoxer_kwargs):
     """
     Voxelize via binvox tool.
 
@@ -60,10 +77,11 @@ def voxelize_binvox(mesh, pitch=None, dimension=None, bounds=None, **binvoxer_kw
     pitch : float
       Side length of each voxel. Ignored if dimension is provided
     dimension: int
-      Number of voxels along each dimension. If not provided, this is alculated
-        based on pitch and bounds/mesh extents
+      Number of voxels along each dimension. If not provided, this is
+        calculated based on pitch and bounds/mesh extents
     bounds: (2, 3) float
-      min/max values of the returned `VoxelGrid` in each instance.
+      min/max values of the returned `VoxelGrid` in each instance. Uses
+      `mesh.bounds` if not provided.
     **binvoxer_kwargs:
       Passed to `trimesh.exchange.binvox.Binvoxer`.
       Should not contain `bounding_box` if bounds is not None.
@@ -74,7 +92,7 @@ def voxelize_binvox(mesh, pitch=None, dimension=None, bounds=None, **binvoxer_kw
 
     Raises
     --------------
-    `ValueError` if both bounds and bounding_box (in binvoxer_kwargs) are given
+    `ValueError` if `bounds is not None and 'bounding_box' in binvoxer_kwargs`.
     """
     from trimesh.exchange import binvox
 
@@ -95,7 +113,7 @@ def voxelize_binvox(mesh, pitch=None, dimension=None, bounds=None, **binvoxer_kw
     return binvox.voxelize_mesh(mesh, binvoxer)
 
 
-def load_voxels(scene, resolution):
+def scene_to_voxels(scene, resolution):
     mesh = as_mesh(scene)
     fix_axes(mesh)
     # vox = mesh.voxelized(
@@ -111,17 +129,3 @@ def load_voxels(scene, resolution):
             % (str((resolution,)*3), str(vox.shape)))
     vox.fill(method='orthographic')
     return vox
-
-
-if __name__ == '__main__':
-    ids, names = base.load_synset_ids()
-
-    # name = 'suitcase'
-    # name = 'watercraft'
-    # name = 'aeroplane'
-    # name = 'table'
-    name = 'rifle'
-
-    config = ShapenetCoreVoxelConfig(synset_id=ids[name], resolution=32)
-    builder = base.ShapenetCore(config=config)
-    builder.download_and_prepare()
