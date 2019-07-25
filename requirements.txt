@@ -2,3 +2,4 @@ tfds-nightly
 trimesh>=3.0.0
 numpy
 git+git://github.com/jackd/collection-utils.git@master
+networkx  # needed by trimesh

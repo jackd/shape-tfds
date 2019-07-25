@@ -45,10 +45,16 @@ SHAPENET_URL = "https://www.shapenet.org/"
 
 
 def as_mesh(scene_or_mesh):
+    """
+    Convert a possible scene to a mesh.
+
+    If conversion occurs, all texture information is lost.
+    """
     import trimesh
     if isinstance(scene_or_mesh, trimesh.Scene):
         mesh = trimesh.util.concatenate(
-            tuple(scene_or_mesh.geometry.values()))
+            tuple(trimesh.Trimesh(vertices=g.vertices, faces=g.faces)
+                  for g in scene_or_mesh.geometry.values()))
     else:
         mesh = scene_or_mesh
     return mesh
