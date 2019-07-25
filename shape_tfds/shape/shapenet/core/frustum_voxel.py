@@ -43,7 +43,6 @@ def _get_voxel_transform(resolution):
     ])
 
 
-
 class ShapenetCoreFrustumVoxelConfig(base.ShapenetCoreConfig):
     def __init__(self, synset_id, resolution=64, seed=0):
         self._seed = seed

@@ -3,6 +3,7 @@ from __future__ import division
 from __future__ import print_function
 
 import abc
+from absl import logging
 import tensorflow as tf
 import tensorflow_datasets.public_api as tfds
 import tqdm
@@ -29,6 +30,28 @@ SHAPENET_CITATION = """\
 """
 
 SHAPENET_URL = "https://www.shapenet.org/"
+
+
+# class LengthedGenerator(object):
+#     def __init__(self, generator, length):
+#         self._generator = generator
+#         self._length = length
+
+#     def __len__(self):
+#         return self._length
+
+#     def __iter__(self):
+#         return iter(self._generator)
+
+
+def as_mesh(scene_or_mesh):
+    import trimesh
+    if isinstance(scene_or_mesh, trimesh.Scene):
+        mesh = trimesh.util.concatenate(
+            tuple(scene_or_mesh.geometry.values()))
+    else:
+        mesh = scene_or_mesh
+    return mesh
 
 
 def mesh_loader(zipfile):
@@ -123,7 +146,14 @@ def load_synset_ids():
     return synset_ids, synset_names
 
 
-BASE_URL = 'http://shapenet.cs.stanford.edu/shapenet/obj-zip/'
+def load_bad_ids():
+    import json
+    path = os.path.join(os.path.dirname(__file__), 'bad_ids.json')
+    with tf.io.gfile.GFile(path, "r") as fp:
+        return json.load(fp)
+
+
+BASE_URL = 'http://shapenet.cs.stanford.edu/shapenet/obj-zip'
 DL_URL = '%s/ShapeNetCore.v1/{synset_id}.zip' % BASE_URL
 SPLIT_URL = '%s/SHREC16/all.csv' % BASE_URL
 TAXONOMY_URL = '%s/ShapeNetCore.v1/taxonomy.json' % BASE_URL
@@ -134,7 +164,7 @@ def _load_taxonomy(path):
         return json.load(fp)
 
 
-def _load_splits_ids(path):
+def _load_splits_ids(path, excluded):
     """Get a `dict: synset_id -> (dict: split -> model_ids)`."""
     split_dicts = {}
     with tf.io.gfile.GFile(path, "r") as fp:
@@ -145,12 +175,18 @@ def _load_splits_ids(path):
                 pass
             record_id, synset_id, sub_synset_id, model_id, split = \
                 line.split(',')
+            if excluded and model_id in excluded.get(synset_id, ()):
+                continue
             del record_id, sub_synset_id
             split_dicts.setdefault(synset_id, {}).setdefault(split, []).append(
                 model_id)
 
     for split_ids in split_dicts.values():
-        split_ids['validation'] = split_ids.pop('val')
+        if 'val' in split_ids:
+            if 'validation' in split_ids:
+                raise RuntimeError('both "val" and "validation" keys found')
+            else:
+                split_ids['validation'] = split_ids.pop('val', None)
     return split_dicts
 
 
@@ -159,9 +195,11 @@ def _dl_manager():
         download_dir=os.path.join(tfds.core.constants.DATA_DIR, 'downloads'))
 
 
-def load_split_ids(dl_manager=None):
+def load_split_ids(dl_manager=None, excluded='bad_ids'):
     dl_manager = dl_manager or _dl_manager()
-    return _load_splits_ids(dl_manager.download(SPLIT_URL))
+    if excluded == 'bad_ids':
+        excluded = load_bad_ids()
+    return _load_splits_ids(dl_manager.download(SPLIT_URL), excluded)
 
 
 def load_taxonomy(dl_manager=None):
@@ -265,29 +303,45 @@ class ShapenetCore(tfds.core.GeneratorBasedBuilder):
     def _split_generators(self, dl_manager):
         config = self.builder_config
         synset_id = config.synset_id
-        model_ids = load_split_ids(dl_manager)[synset_id]
+        model_ids = load_split_ids(dl_manager)
+        if synset_id in model_ids:
+            model_ids = model_ids[synset_id]
+        else:
+            raise NotImplementedError
         splits = sorted(model_ids.keys())
         loader_context = config.loader_context(dl_manager=dl_manager)
 
-        return [tfds.core.SplitGenerator(
+        gens = [tfds.core.SplitGenerator(
             name=split, num_shards=len(model_ids[split]) // 500 + 1,
             gen_kwargs=dict(
                 loader_context=loader_context, model_ids=model_ids[split]))
                 for split in splits]
+        # we add num_examples for better progress bar info
+        # this may cause issues if not every model generates an example
+        for gen in gens:
+            gen.split_info.statistics.num_examples = len(
+                model_ids[gen.name])
+        return gens
 
-    def _generate_examples(self, **kwargs):
-        gen = self._generate_example_data(**kwargs)
+    def _generate_examples(self, model_ids, **kwargs):
+        gen = self._generate_example_data(model_ids=model_ids, **kwargs)
         if (
                 hasattr(self.version, 'implements') and
                 self.version.implements(tfds.core.Experiment.S3)):
-            return ((v['model_id'], v) for v in gen)
-        else:
-            return gen
+            gen = ((v['model_id'], v) for v in gen)
+        # return LengthedGenerator(gen, len(model_ids))
+        return gen
 
     def _generate_example_data(self, loader_context, model_ids):
         with loader_context as loader:
             for model_id in model_ids:
-                example_data = loader[model_id]
+                try:
+                    example_data = loader[model_id]
+                except Exception:
+                    logging.error(
+                        'Error loading example %s / %s' %
+                        (self.builder_config.synset_id, model_id))
+                    raise
                 if example_data is not None:
                     assert('model_id' not in example_data)
                     example_data['model_id'] = model_id

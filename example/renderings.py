@@ -2,36 +2,47 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from absl import app
+from absl import flags
 import tensorflow as tf
 import tensorflow_datasets as tfds
 from shape_tfds.shape.shapenet import core
 
 import tensorflow as tf
 import matplotlib.pyplot as plt
-tf.compat.v1.enable_eager_execution()
-ids, names = core.load_synset_ids()
 
-download_config = tfds.core.download.DownloadConfig(
-    register_checksums=True)
-
-synset_name = 'suitcase'
-# name = 'watercraft'
-# name = 'aeroplane'
-seed_offset = 0
-synset_id = ids[synset_name]
-
-resolution = (128, 128)
-builder = core.ShapenetCore(
-        config=core.ShapenetCoreRenderingsConfig(
-    synset_id=synset_id, resolution=resolution, seed=seed_offset))
-builder.download_and_prepare(download_config=download_config)
-
-def view(example):
-    image = example['image'].numpy()
-    plt.imshow(image)
-    plt.show()
+flags.DEFINE_string('name', default='suitcase', help='synset name')
+flags.DEFINE_integer('resolution', default=128, help='voxel resolution')
+flags.DEFINE_integer('seed', default=0, help='seed to use for random_view_fn')
+flags.DEFINE_boolean('vis', default=False, help='visualize on finish')
 
 
-dataset = builder.as_dataset(split='train')
-for example in dataset:
-    view(example)
+def main(_):
+    tf.compat.v1.enable_eager_execution()
+    FLAGS = flags.FLAGS
+    ids, names = core.load_synset_ids()
+    name = FLAGS.name
+
+    synset_id = name if name in names else ids[name]
+    if synset_id not in names:
+        raise ValueError('Invalid synset_id %s' % synset_id)
+
+    builder = core.ShapenetCore(config=core.ShapenetCoreRenderingsConfig(
+        synset_id=synset_id,
+        resolution=(FLAGS.resolution,)*2,
+        seed=FLAGS.seed))
+    builder.download_and_prepare()
+
+    if FLAGS.vis:
+        def vis(example):
+            import matplotlib.pyplot as plt
+            plt.imshow(example['image'].numpy())
+            plt.show()
+
+        dataset = builder.as_dataset(split='train')
+        for example in dataset:
+            vis(example)
+
+
+if __name__ == '__main__':
+    app.run(main)

@@ -2,54 +2,64 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import numpy as np
+from absl import app
+from absl import flags
 import tensorflow as tf
+import tensorflow_datasets as tfds
 from shape_tfds.shape.shapenet import core
-tf.compat.v1.enable_eager_execution()
 
-ids, names = core.load_synset_ids()
-resolution = 256
-seed_offset = 0
-synset_name = 'suitcase'
-# name = 'watercraft'
-# name = 'aeroplane'
-# name = 'table'
-# name = 'rifle'
+import tensorflow as tf
+import matplotlib.pyplot as plt
+import numpy as np
 
-synset_id = ids[synset_name]
-nx = resolution
-ny = resolution
-view_fn = core.views.random_view_fn(seed_offset)
-
-configs = dict(
-    image=core.ShapenetCoreRenderingsConfig(
-        synset_id=synset_id, resolution=(resolution,)*2, seed=seed_offset),
-    voxels=core.ShapenetCoreFrustumVoxelConfig(
-        synset_id=synset_id, resolution=resolution, seed=seed_offset))
-builders = {k: core.ShapenetCore(config=config)
-            for k, config in configs.items()}
-for b in builders.values():
-    b.download_and_prepare()
-
-datasets = {
-    k: b.as_dataset(split='train', shuffle_files=False).map(
-        lambda x: x[k]) for k, b in builders.items()}
-
-dataset = tf.data.Dataset.zip(datasets)
+flags.DEFINE_string('name', default='suitcase', help='synset name')
+flags.DEFINE_integer('vox_res', default=32, help='voxel resolution')
+flags.DEFINE_integer('image_res', default=128, help='voxel resolution')
+flags.DEFINE_integer('seed', default=0, help='seed to use for random_view_fn')
+flags.DEFINE_boolean('vis', default=False, help='visualize on finish')
 
 
-def vis():
-    import matplotlib.pyplot as plt
-    for example in dataset:
-        image = example['image'].numpy()
-        voxels = tf.reduce_any(example['voxels'], axis=-1).numpy()
-        image[np.logical_not(voxels)] = 0
-        plt.imshow(image)
-        plt.show()
-        # _, (ax0, ax1) = plt.subplots(1, 2)
-        # ax0.imshow(image)
-        # ax1.imshow(voxels)
-        # plt.show()
+def main(_):
+    tf.compat.v1.enable_eager_execution()
+    FLAGS = flags.FLAGS
+    ids, names = core.load_synset_ids()
+    name = FLAGS.name
+    seed = FLAGS.seed
+
+    synset_id = name if name in names else ids[name]
+    if synset_id not in names:
+        raise ValueError('Invalid synset_id %s' % synset_id)
+
+    configs = dict(
+        image=core.ShapenetCoreRenderingsConfig(
+            synset_id=synset_id, resolution=(FLAGS.image_res,)*2, seed=seed),
+        voxels=core.ShapenetCoreFrustumVoxelConfig(
+            synset_id=synset_id, resolution=FLAGS.vox_res, seed=seed))
+    builders = {k: core.ShapenetCore(config=config)
+                for k, config in configs.items()}
+    for b in builders.values():
+        b.download_and_prepare()
+
+    if FLAGS.vis:
+        def vis(example):
+            import matplotlib.pyplot as plt
+            image = example['image'].numpy()
+            voxels = tf.reduce_any(example['voxels'], axis=-1)
+            voxels = tf.image.resize(
+                tf.expand_dims(tf.cast(voxels, tf.uint8), axis=-1),
+                image.shape[:2], method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+            voxels = tf.cast(tf.squeeze(voxels, axis=-1), tf.bool).numpy()
+            image[np.logical_not(voxels)] = 0
+            plt.imshow(image)
+            plt.show()
+
+        datasets = {
+            k: b.as_dataset(split='train', shuffle_files=False).map(
+                lambda x: x[k]) for k, b in builders.items()}
+        dataset = tf.data.Dataset.zip(datasets)
+        for example in dataset:
+            vis(example)
 
 
-vis()
+if __name__ == '__main__':
+    app.run(main)

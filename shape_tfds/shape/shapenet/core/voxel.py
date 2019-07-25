@@ -55,16 +55,6 @@ class ShapenetCoreVoxelConfig(base.ShapenetCoreConfig):
             self.base_loader_context)(dl_manager)
 
 
-def as_mesh(scene_or_mesh):
-    if isinstance(scene_or_mesh, trimesh.Scene):
-        mesh = trimesh.util.concatenate([
-            trimesh.Trimesh(vertices=m.vertices, faces=m.faces)
-            for m in scene_or_mesh.geometry.values()])
-    else:
-        mesh = scene_or_mesh
-    return mesh
-
-
 def voxelize_binvox(
         mesh, pitch=None, dimension=None, bounds=None, **binvoxer_kwargs):
     """
@@ -114,7 +104,7 @@ def voxelize_binvox(
 
 
 def scene_to_voxels(scene, resolution):
-    mesh = as_mesh(scene)
+    mesh = base.as_mesh(scene)
     fix_axes(mesh)
     # vox = mesh.voxelized(
     vox = voxelize_binvox(

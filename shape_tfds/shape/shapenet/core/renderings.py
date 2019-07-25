@@ -48,10 +48,10 @@ class ShapenetCoreRenderingsConfig(base.ShapenetCoreConfig):
         return base.mesh_loader_context(
             synset_id=self.synset_id, dl_manager=dl_manager,
             item_map_fn=lambda key, scene: dict(image=render(
-                scene, self.resolution, **view_fn(key))))
+                key, scene, self.resolution, **view_fn(key))))
 
 
-def render(scene, resolution, position, focal):
+def render(key, scene, resolution, position, focal):
     if not isinstance(scene, trimesh.Scene):
         scene = scene.scene()
     views.fix_axes(scene)
