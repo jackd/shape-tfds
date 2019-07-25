@@ -5,6 +5,13 @@ with open('requirements.txt') as fp:
       install_requires = fp.read().split('\n')
 
 
+DATASET_FILES = [
+      'url_checksums/*',
+      'shape/shapenet/core/bad_ids.json',
+      'shape/shapenet/core/core_synset.txt',
+]
+
+
 setup(name='shape-tfds',
       version='0.1',
       description='tensorflow_datasets implementations for shape datasets',
@@ -15,6 +22,7 @@ setup(name='shape-tfds',
       # packages=['shape_tfds'],
       packages=find_packages(),
       requirements=install_requires,
-      # include_package_data=True,
+      include_package_data=True,
+      package_data={'shape_tfds': DATASET_FILES}
       # zip_safe=False
 )
