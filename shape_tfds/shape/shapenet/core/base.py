@@ -69,8 +69,8 @@ def mesh_loader(zipfile):
         subdir = os.path.join(synset_id, key)
         resolver = ZipSubdirResolver(zipfile, subdir)
         obj = os.path.join(subdir, 'model.obj')
-        return trimesh.load(
-            zipfile.open(obj), file_type='obj', resolver=resolver)
+        with zipfile.open(obj) as fp:
+            return trimesh.load(fp, file_type='obj', resolver=resolver)
 
     return Mapping.mapped(keys, load_fn)
 
