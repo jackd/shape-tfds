@@ -7,7 +7,6 @@ with open('requirements.txt') as fp:
 
 DATASET_FILES = [
       'url_checksums/*',
-      'shape/shapenet/core/bad_ids.json',
       'shape/shapenet/core/core_synset.txt',
 ]
 
@@ -19,7 +18,6 @@ setup(name='shape-tfds',
       author='Dominic Jack',
       author_email='thedomjack@gmail.com',
       license='MIT',
-      # packages=['shape_tfds'],
       packages=find_packages(),
       requirements=install_requires,
       include_package_data=True,

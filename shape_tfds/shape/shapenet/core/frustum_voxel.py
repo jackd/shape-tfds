@@ -61,7 +61,7 @@ class ShapenetCoreFrustumVoxelConfig(base.ShapenetCoreConfig):
     def resolution(self):
         return self._resolution
 
-    def loader_context(self, dl_manager=None):
+    def loader(self, dl_manager=None):
         view_fn = views.random_view_fn(seed_offset=self._seed)
         transform = _get_voxel_transform(self._resolution)
 

@@ -3,3 +3,5 @@ trimesh>=3.0.0
 numpy
 git+git://github.com/jackd/collection-utils.git@master
 networkx
+git+git://github.com/mmatl/pyopengl.git
+pyrender

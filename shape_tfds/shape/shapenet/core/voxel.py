@@ -6,6 +6,7 @@ from __future__ import print_function
 import os
 import time
 import numpy as np
+import tensorflow as tf
 import tensorflow_datasets as tfds
 from shape_tfds.shape.shapenet.core import base
 from shape_tfds.core.resolver import ZipSubdirResolver
@@ -35,24 +36,39 @@ class ShapenetCoreVoxelConfig(base.ShapenetCoreConfig):
         return self._resolution
 
 
-    def base_loader_context(self, dl_manager=None):
-        return base.mesh_loader_context(
-            synset_id=self.synset_id, dl_manager=dl_manager,
-            item_map_fn=lambda key, scene: dict(
-                voxels=scene_to_voxels(
-                    scene, self._resolution).encoding.dense))
+    def base_loader(self, dl_manager=None):
+        import trimesh
+        binvoxer = trimesh.exchange.binvox.Binvoxer(
+            exact=True, dimension=self._resolution)
 
-    def mapping_loader_context(self, dl_manager=None):
+        def map_fn(obj_path):
+            binvox_path = binvoxer(obj_path)
+            with tf.io.gfile.GFile(binvox_path, "rb") as fp:
+                vox = trimesh.exchange.binvox.load_binvox(fp)
+            tf.io.gfile.remove(binvox_path)
+            vox.fill(method='orthographic')
+            return vox
+
+        return base.extracted_mesh_paths(
+            self.synset_id, dl_manager).map(map_fn)
+
+        # return base.zipped_mesh_loader_context(
+        #     synset_id=self.synset_id, dl_manager=dl_manager,
+        #     item_map_fn=lambda key, scene: dict(
+        #         voxels=scene_to_voxels(
+        #             scene, self._resolution).encoding.dense))
+
+    def mapping_loader(self, dl_manager=None):
         return base.get_data_mapping_context(
             config=ShapenetCoreVoxelConfig(
                 synset_id=self.synset_id, resolution=self.resolution,
                 from_file_mapping=False),
             dl_manager=dl_manager)
 
-    def loader_context(self, dl_manager):
+    def loader(self, dl_manager):
         return (
-            self.mapping_loader_context if self._from_file_mapping else
-            self.base_loader_context)(dl_manager)
+            self.mapping_loader if self._from_file_mapping else
+            self.base_loader)(dl_manager)
 
 
 def voxelize_binvox(

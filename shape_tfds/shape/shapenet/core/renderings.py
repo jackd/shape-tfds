@@ -43,9 +43,9 @@ class ShapenetCoreRenderingsConfig(base.ShapenetCoreConfig):
         return dict(
             image=features.Image(shape=self.resolution + (3,)))
 
-    def loader_context(self, dl_manager=None):
+    def loader(self, dl_manager=None):
         view_fn = views.random_view_fn(self.seed)
-        return base.mesh_loader_context(
+        return base.zipped_mesh_loader_context(
             synset_id=self.synset_id, dl_manager=dl_manager,
             item_map_fn=lambda key, scene: dict(image=render(
                 key, scene, self.resolution, **view_fn(key))))

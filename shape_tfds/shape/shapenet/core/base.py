@@ -17,6 +17,18 @@ import itertools
 import contextlib
 import functools
 
+from collection_utils.mapping import Mapping
+from collection_utils.iterable import single
+
+_bad_ids = {
+    '04090263': (
+        '4a32519f44dc84aabafe26e2eb69ebf4',  # empty
+    ),
+    '02691156': (
+        'b644db95fe32d115d8d90babf3c5509a',  # too big
+    )
+}
+
 SHAPENET_CITATION = """\
 @article{chang2015shapenet,
     title={Shapenet: An information-rich 3d model repository},
@@ -52,16 +64,19 @@ def as_mesh(scene_or_mesh):
     """
     import trimesh
     if isinstance(scene_or_mesh, trimesh.Scene):
-        mesh = trimesh.util.concatenate(
-            tuple(trimesh.Trimesh(vertices=g.vertices, faces=g.faces)
-                  for g in scene_or_mesh.geometry.values()))
+        if len(scene_or_mesh.geometry) == 0:
+            mesh = None  # empty scene
+        else:
+            # we lose texture information here
+            mesh = trimesh.util.concatenate(
+                tuple(trimesh.Trimesh(vertices=g.vertices, faces=g.faces)
+                    for g in scene_or_mesh.geometry.values()))
     else:
         mesh = scene_or_mesh
     return mesh
 
 
-def mesh_loader(zipfile):
-    from collection_utils.mapping import Mapping
+def zipped_mesh_loader(zipfile):
     namelist = zipfile.namelist()
     if len(namelist) == 0:
         raise ValueError('No entries in namelist')
@@ -82,17 +97,16 @@ def mesh_loader(zipfile):
 
 
 class MappedFileContext(object):
-    def __init__(self, path, map_fn, on_open=None, on_close=None, mode='rb'):
+    def __init__(self, path, map_fn, on_open=None, on_close=None):
         self._path = path
         self._map_fn = map_fn
-        self._mode = mode
         self._fp = None
         self._args = None
         self._on_open = on_open
         self._on_close = on_close
 
     def __enter__(self):
-        self._fp = tf.io.gfile.GFile(self._path, mode=self._mode)
+        self._fp = tf.io.gfile.GFile(self._path, mode='rb')
         out, self._arg = self._map_fn(self._fp)
         if self._on_open is not None:
             self._on_open(self._arg)
@@ -106,15 +120,17 @@ class MappedFileContext(object):
         self._fp = None
 
 
-def mesh_loader_context(synset_id, dl_manager=None, item_map_fn=None):
+def zipped_mesh_loader_context(synset_id, dl_manager=None, item_map_fn=None):
     """
     Get a mesh loading context.
 
     Delays downloading relevant zip files until opened.
 
+    Does not extract files.
+
     Example usage:
     ```python
-    loader_context = mesh_loader_context(synset_id)
+    loader_context = zipped_mesh_loader_context(synset_id)
     with loader_context as loader:
         # possible download starts
         for key in loader:
@@ -124,13 +140,25 @@ def mesh_loader_context(synset_id, dl_manager=None, item_map_fn=None):
     ```
     """
     def file_map_fn(fp):
-        loader = mesh_loader(zipfile.ZipFile(fp))
+        loader = zipped_mesh_loader(zipfile.ZipFile(fp))
         if item_map_fn is not None:
             loader = loader.item_map(item_map_fn)
         return loader, None
 
     return MappedFileContext(
         get_obj_zip_path(synset_id, dl_manager), map_fn=file_map_fn)
+
+
+def extracted_mesh_paths(synset_id, dl_manager=None):
+    dl_manager = dl_manager or _dl_manager()
+    zip_path = get_obj_zip_path(synset_id, dl_manager)
+    root_dir = dl_manager.extract(zip_path)
+    synset_dir = os.path.join(root_dir, synset_id)
+    assert(tf.io.gfile.isdir(synset_dir))
+    model_ids = tf.io.gfile.listdir(synset_dir)
+    return Mapping.mapped(
+        tuple(model_ids),
+        lambda key: os.path.join(synset_dir, key, 'model.obj'))
 
 
 def load_synset_ids():
@@ -152,11 +180,11 @@ def load_synset_ids():
     return synset_ids, synset_names
 
 
-def load_bad_ids():
-    import json
-    path = os.path.join(os.path.dirname(__file__), 'bad_ids.json')
-    with tf.io.gfile.GFile(path, "r") as fp:
-        return json.load(fp)
+def load_id_sets(key='bad_ids'):
+    if key == 'bad_ids':
+        return _bad_ids
+    else:
+        raise KeyError('Invalid key "%s"' % key)
 
 
 BASE_URL = 'http://shapenet.cs.stanford.edu/shapenet/obj-zip'
@@ -193,6 +221,7 @@ def _load_splits_ids(path, excluded):
                 raise RuntimeError('both "val" and "validation" keys found')
             else:
                 split_ids['validation'] = split_ids.pop('val', None)
+
     return split_dicts
 
 
@@ -204,7 +233,7 @@ def _dl_manager():
 def load_split_ids(dl_manager=None, excluded='bad_ids'):
     dl_manager = dl_manager or _dl_manager()
     if excluded == 'bad_ids':
-        excluded = load_bad_ids()
+        excluded = _bad_ids
     return _load_splits_ids(dl_manager.download(SPLIT_URL), excluded)
 
 
@@ -238,7 +267,7 @@ class ShapenetCoreConfig(tfds.core.BuilderConfig):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def loader_context(self, dl_manager=None):
+    def loader(self, dl_manager=None):
         raise NotImplementedError
 
 
@@ -315,12 +344,11 @@ class ShapenetCore(tfds.core.GeneratorBasedBuilder):
         else:
             raise NotImplementedError
         splits = sorted(model_ids.keys())
-        loader_context = config.loader_context(dl_manager=dl_manager)
+        loader = config.loader(dl_manager=dl_manager)
 
         gens = [tfds.core.SplitGenerator(
             name=split, num_shards=len(model_ids[split]) // 500 + 1,
-            gen_kwargs=dict(
-                loader_context=loader_context, model_ids=model_ids[split]))
+            gen_kwargs=dict(loader=loader, model_ids=model_ids[split]))
                 for split in splits]
         # we add num_examples for better progress bar info
         # this may cause issues if not every model generates an example
@@ -338,8 +366,18 @@ class ShapenetCore(tfds.core.GeneratorBasedBuilder):
         # return LengthedGenerator(gen, len(model_ids))
         return gen
 
-    def _generate_example_data(self, loader_context, model_ids):
-        with loader_context as loader:
+    def _generate_example_data(self, loader, model_ids):
+        if hasattr(loader, '__enter__'):
+            with loader as loader:
+                for example in self._generate_example_data_with_loader(
+                        loader, model_ids):
+                    yield example
+        else:
+            for example in self._generate_example_data_with_loader(
+                    loader, model_ids):
+                yield example
+
+    def _generate_example_data_with_loader(self, loader, model_ids):
             for model_id in model_ids:
                 try:
                     example_data = loader[model_id]
