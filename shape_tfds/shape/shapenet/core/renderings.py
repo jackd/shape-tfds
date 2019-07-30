@@ -20,6 +20,7 @@ import tensorflow_datasets as tfds
 import trimesh
 from shape_tfds.shape.shapenet.core import base
 from shape_tfds.shape.shapenet.core import views
+from shape_tfds.core import mapping as shape_mapping
 from tensorflow_datasets.core import features
 import tensorflow_datasets as tfds
 import tempfile
@@ -28,22 +29,17 @@ from collection_utils import mapping
 from PIL import Image
 
 
+def _string_to_image(string):
+    import trimesh
+    return Image.open(trimesh.util.BytesIO(string))
+
+
 def _image_with_background(image, background_color):
     image = np.array(image)
     background = image[:, :, 3] == 0
     image = image[:, :, :3]
     image[background] = background_color
     return Image.fromarray(image)
-
-
-def _image_to_string(image, img_format='png'):
-    with trimesh.util.BytesIO() as buffer:
-        image.save(buffer, img_format)
-        return buffer.getvalue()
-
-
-def _string_to_image(string):
-    return Image.open(trimesh.util.BytesIO(string))
 
 
 class Renderer(object):
@@ -83,8 +79,10 @@ class Renderer(object):
         raise NotImplementedError
 
     def create_multi_cache(
-            self, synset_id, seeds, model_ids=None, dl_manager=None,
+            self, synset_id, seeds, keys, dl_manager=None,
             overwrite=False):
+        model_ids = keys
+        del keys
         cache_mappings = []
         view_fns = []
         for seed in seeds:
@@ -175,59 +173,6 @@ class TrimeshRenderer(Renderer):
 _renderer_factories = {'trimesh': TrimeshRenderer, 'blender': BlenderRenderer}
 
 
-class ImageDirectoryCache(collections.Mapping):
-    def __init__(self, root_dir, extension='png'):
-        self._root_dir = root_dir
-        self._extension = extension
-
-    def keys(self):
-        return (
-            k for k in tf.io.gfile.listdir(self._root_dir)
-            if k.endswith('.png'))
-
-    def __len__(self):
-        return len(tuple(self.keys()))
-
-    def __iter__(self):
-        return iter(self.keys())
-
-    def __contains__(self, key):
-        return tf.io.gfile.exists(self._path(key))
-
-    def _path(self, key):
-        return os.path.join(self._root_dir, '%s.png' % key)
-
-    def __getitem__(self, key):
-        path = self._path(key)
-        if not tf.io.gfile.exists(path):
-            raise KeyError('No file at path %s' % path)
-        return path
-
-    def __setitem__(self, key, value):
-        if not tf.io.gfile.isdir(self._root_dir):
-            tf.io.gfile.makedirs(self._root_dir)
-        dst = self._path(key)
-        if hasattr(value, 'read'):
-            value = value.read()
-        elif isinstance(value, Image.Image):
-            value = _image_to_string(value)
-        if isinstance(value, bytes):
-            with tf.io.gfile.GFile(dst, 'wb') as fp:
-                fp.write(value)
-        elif isinstance(value, six.string_types):
-            with tf.io.gfile.GFile(value, 'rb') as src:
-                with tf.io.gfile.GFile(dst, 'wb') as fp:
-                    fp.write(src.read())
-        else:
-            raise TypeError(value)
-
-    def __delitem__(self, key):
-        tf.io.gfile.remove(self._path(key))
-
-    def move(self, path, key):
-        tf.io.gfile.rename(path, self._path(key))
-
-
 class RenderingConfig(base.ShapenetCoreConfig):
     def __init__(self, synset_id, renderer, seed=0):
         if isinstance(renderer, dict):
@@ -270,7 +215,7 @@ class RenderingConfig(base.ShapenetCoreConfig):
             yield mapping.ItemMappedMapping(base_mapping, map_item)
 
     def _cache_mapping(self, cache_dir):
-        return ImageDirectoryCache(cache_dir)
+        return shape_mapping.ImageDirectoryMapping(cache_dir)
 
     @contextlib.contextmanager
     def cache_mapping(self, cache_dir, mode='r'):
@@ -279,10 +224,10 @@ class RenderingConfig(base.ShapenetCoreConfig):
             lambda image: dict(image=image))
 
     def create_cache(
-            self, cache_dir, model_ids=None, dl_manager=None,
+            self, cache_dir, keys, dl_manager=None,
             overwrite=False):
         # WARNING: slow if you want to create multiple view caches
         # use Renderer.create_multi_cache with multiple seeds
         self._renderer.create_multi_cache(
-            self.synset_id, model_ids=model_ids, seeds=(self.seed,),
+            self.synset_id, keys=keys, seeds=(self.seed,),
             dl_manager=None, overwrite=False)

@@ -20,8 +20,8 @@ import functools
 
 from collection_utils.mapping import Mapping
 from collection_utils.iterable import single
-
-DOWNLOADS_DIR = os.path.join(tfds.core.constants.DATA_DIR, 'downloads')
+from shape_tfds.core import mapping as shape_mapping
+from shape_tfds.core.downloads import get_dl_manager
 
 _bad_ids = {
     '04090263': (
@@ -33,24 +33,8 @@ _bad_ids = {
 }
 
 
-class ImmutableMapping(collections.Mapping):
-    def __init__(self, base_mapping):
-        self._base = base_mapping
-
-    def __getitem__(self, key):
-        return self._base[key]
-
-    def __iter__(self):
-        return iter(self._base)
-
-    def __len__(self):
-        return len(self._base)
-
-    def __contains__(self, key):
-        return key in self._base
-
-
-id_sets = ImmutableMapping({'bad_ids': ImmutableMapping(_bad_ids)})
+id_sets = shape_mapping.ImmutableMapping(
+    {'bad_ids': shape_mapping.ImmutableMapping(_bad_ids)})
 
 
 SHAPENET_CITATION = """\
@@ -201,7 +185,7 @@ def zipped_mesh_loader_context(synset_id, dl_manager=None, item_map_fn=None):
 
 
 def extracted_mesh_paths(synset_id, dl_manager=None):
-    dl_manager = dl_manager or _dl_manager()
+    dl_manager = dl_manager or get_dl_manager()
     zip_path = get_obj_zip_path(synset_id, dl_manager)
     root_dir = dl_manager.extract(zip_path)
     synset_dir = os.path.join(root_dir, synset_id)
@@ -274,12 +258,8 @@ def _load_splits_ids(path, excluded):
     return split_dicts
 
 
-def _dl_manager():
-    return tfds.core.download.DownloadManager(download_dir=DOWNLOADS_DIR)
-
-
 def load_split_ids(dl_manager=None, excluded='bad_ids'):
-    dl_manager = dl_manager or _dl_manager()
+    dl_manager = dl_manager or get_dl_manager()
 
     return _load_splits_ids(
         dl_manager.download(SPLIT_URL),
@@ -287,17 +267,17 @@ def load_split_ids(dl_manager=None, excluded='bad_ids'):
 
 
 def load_taxonomy(dl_manager=None):
-    dl_manager = dl_manager or _dl_manager()
+    dl_manager = dl_manager or get_dl_manager()
     return _load_taxonomy(dl_manager.download(TAXONOMY_URL))
 
 
 def get_obj_zip_path(synset_id, dl_manager=None):
     """Get path of zip file containing obj files."""
-    dl_manager = dl_manager or _dl_manager()
+    dl_manager = dl_manager or get_dl_manager()
     return dl_manager.download(DL_URL.format(synset_id=synset_id))
 
 
-class ShapenetCoreConfig(tfds.core.BuilderConfig):
+class ShapenetCoreConfig(shape_mapping.MappingConfig):
     def __init__(self, synset_id, **kwargs):
         self._synset_id = synset_id
         super(ShapenetCoreConfig, self).__init__(**kwargs)
@@ -306,132 +286,23 @@ class ShapenetCoreConfig(tfds.core.BuilderConfig):
     def synset_id(self):
         return self._synset_id
 
+
+class ShapenetCore(shape_mapping.MappingBuilder):
     @property
-    def supervised_keys(self):
-        return None
-
-    @abc.abstractproperty
-    def features(self):
-        """dict of features (not including 'model_id')."""
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def lazy_mapping(self, dl_manager=None):
-        raise NotImplementedError
-
-    @contextlib.contextmanager
-    def cache_mapping(self, cache_dir, mode='r'):
-        import h5py
-        from shape_tfds.core import mapping
-        feature = tfds.core.features.FeaturesDict(self.features)
-        feature._set_top_level()
-        path = os.path.join(cache_dir, 'cache.h5')
-        if not tf.io.gfile.isdir(cache_dir):
-            tf.io.gfile.makedirs(cache_dir)
-        with h5py.File(path, mode=mode) as h5:
-            with mapping.FeatureMapping(feature, mapping.H5Mapping(h5)) as fm:
-                yield fm
-
-    def create_cache(
-            self, cache_dir, model_ids=None, dl_manager=None, overwrite=False):
-        if model_ids is None:
-            model_ids = load_split_ids(dl_manager)[self.synset_id]
-            model_ids = np.concatenate(
-                [model_ids[k] for k in ('test', 'train', 'validation')])
-        with self.cache_mapping(cache_dir, mode='a') as cache:
-            if not overwrite:
-                model_ids = tuple(k for k in model_ids if k not in cache)
-            if len(model_ids) == 0:
-                return
-            with self.lazy_mapping(dl_manager) as src:
-                for k in tqdm.tqdm(model_ids, desc='creating cache'):
-                    cache[k] = src[k]
-
-
-class ShapenetCore(tfds.core.GeneratorBasedBuilder):
-    def __init__(self, from_cache=False, overwrite_cache=False, **kwargs):
-        self._from_cache = from_cache
-        self._overwrite_cache = overwrite_cache
-        super(ShapenetCore, self).__init__(**kwargs)
+    def key(self):
+        return 'model_id'
 
     @property
-    def cache_dir(self):
-        head, tail = os.path.split(self.data_dir)
-        if 'incomplete' in tail:
-            tail = '.'.join(tail.split('.')[:-1])
-        return os.path.join(head, 'cache', tail)
+    def key_feature(self):
+        return tfds.core.features.Text()
 
-    def create_cache(self, model_ids=None, dl_manager=None):
-        self.builder_config.create_cache(
-            cache_dir=self.cache_dir,
-            model_ids=model_ids,
-            dl_manager=dl_manager,
-            overwrite=self._overwrite_cache)
+    def _load_split_keys(self, dl_manager):
+        return load_split_ids(dl_manager)[self.builder_config.synset_id]
 
-    def remove_cache(self):
-        tf.io.gfile.rmtree(self.cache_dir)
+    @property
+    def citation(self):
+        return SHAPENET_CITATION
 
-    def _info(self):
-        features = self.builder_config.features
-        assert('model_id' not in features)
-        features['model_id'] = tfds.core.features.Text()
-        return tfds.core.DatasetInfo(
-            builder=self,
-            features=tfds.core.features.FeaturesDict(features),
-            citation=SHAPENET_CITATION,
-            supervised_keys=self.builder_config.supervised_keys,
-            urls=[SHAPENET_URL],
-        )
-
-    def _split_generators(self, dl_manager):
-        config = self.builder_config
-        synset_id = config.synset_id
-        model_ids = load_split_ids(dl_manager)
-        if synset_id in model_ids:
-            model_ids = model_ids[synset_id]
-        else:
-            raise NotImplementedError
-        splits = sorted(model_ids.keys())
-
-        if self._from_cache:
-            self.create_cache(
-                dl_manager=dl_manager,
-                model_ids=np.concatenate([model_ids[s] for s in splits]))
-            mapping_fn = functools.partial(
-                config.cache_mapping, cache_dir=self.cache_dir, mode='r')
-        else:
-            mapping_fn = functools.partial(
-                config.lazy_mapping, dl_manager=dl_manager)
-
-        gens = [tfds.core.SplitGenerator(
-            name=split, num_shards=len(model_ids[split]) // 500 + 1,
-            gen_kwargs=dict(mapping_fn=mapping_fn, model_ids=model_ids[split]))
-                for split in splits]
-        # we add num_examples for better progress bar info
-        for gen in gens:
-            gen.split_info.statistics.num_examples = len(model_ids[gen.name])
-        return gens
-
-    def _generate_examples(self, model_ids, **kwargs):
-        # wraps _generate_example_data, adding model_id as a key if
-        # `self.version.implements(tfds.core.Experiment.S3)`
-        gen = self._generate_example_data(model_ids=model_ids, **kwargs)
-        if (
-                hasattr(self.version, 'implements') and
-                self.version.implements(tfds.core.Experiment.S3)):
-            gen = ((v['model_id'], v) for v in gen)
-        return gen
-
-    def _generate_example_data(self, mapping_fn, model_ids):
-        with mapping_fn() as mapping:
-            for model_id in model_ids:
-                try:
-                    out = mapping[model_id]
-                    assert('model_id' not in out)
-                    out['model_id'] = model_id
-                    yield out
-                except Exception:
-                    logging.error(
-                        'Error loading example %s / %s' %
-                        (self.builder_config.synset_id, model_id))
-                    raise
+    @property
+    def urls(self):
+        return [SHAPENET_URL]

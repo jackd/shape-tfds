@@ -1,14 +1,40 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+
 import abc
+from absl import logging
 import collections
 import os
 import numpy as np
+import six
 import tensorflow as tf
+import tensorflow_datasets as tfds
 import h5py
+import contextlib
+import functools
+import tqdm
+from PIL import Image
 
-class DirectoryMapping(collections.Mapping):
+
+class ImmutableMapping(collections.Mapping):
+    def __init__(self, base_mapping):
+        self._base = base_mapping
+
+    def __getitem__(self, key):
+        return self._base[key]
+
+    def __iter__(self):
+        return iter(self._base)
+
+    def __len__(self):
+        return len(self._base)
+
+    def __contains__(self, key):
+        return key in self._base
+
+
+class ShallowDirectoryMapping(collections.Mapping):
     def __init__(self, root_dir):
         self._root_dir = root_dir
 
@@ -42,6 +68,97 @@ class DirectoryMapping(collections.Mapping):
 
     def __delitem__(self, key):
         os.remove(self._path(key))
+
+
+def _is_file(path):
+    return tf.io.gfile.exists(path) and not tf.io.gfile.isdir(path)
+
+
+class DeepDirectoryMapping(collections.Mapping):
+    def __init__(self, root_dir):
+        self._root_dir = root_dir
+
+    def _path(self, key):
+        return os.path.join(self._root_dir, key)
+
+    def __getitem__(self, key):
+        path = self._path(key)
+        if _is_file(path):
+            return path
+        else:
+            raise KeyError(key)
+
+    def __contains__(self, key):
+        return _is_file(self._path(key))
+
+    def __iter__(self):
+        return iter(self.keys())
+
+    def __len__(self):
+        return sum(len(walk[2]) for walk in tf.io.gfile.walk(self._root_dir))
+
+    def keys(self):
+        n = len(self._root_dir) + 1
+        for dirname, _, fns in os.walk(self._root_dir):
+            for fn in fns:
+                yield os.path.join(dirname[n:], fn)
+
+
+def _image_to_string(image, img_format='png'):
+    import trimesh
+    with trimesh.util.BytesIO() as buffer:
+        image.save(buffer, img_format)
+        return buffer.getvalue()
+
+
+class ImageDirectoryMapping(collections.Mapping):
+    def __init__(self, root_dir, extension='png'):
+        self._root_dir = root_dir
+        self._extension = extension
+
+    def keys(self):
+        return (
+            k for k in tf.io.gfile.listdir(self._root_dir)
+            if k.endswith('.png'))
+
+    def __len__(self):
+        return len(tuple(self.keys()))
+
+    def __iter__(self):
+        return iter(self.keys())
+
+    def __contains__(self, key):
+        return tf.io.gfile.exists(self._path(key))
+
+    def _path(self, key):
+        return os.path.join(self._root_dir, '%s.png' % key)
+
+    def __getitem__(self, key):
+        path = self._path(key)
+        if not tf.io.gfile.exists(path):
+            raise KeyError('No file at path %s' % path)
+        return path
+
+    def __setitem__(self, key, value):
+        if not tf.io.gfile.isdir(self._root_dir):
+            tf.io.gfile.makedirs(self._root_dir)
+        dst = self._path(key)
+        if hasattr(value, 'read'):
+            value = value.read()
+        elif isinstance(value, Image.Image):
+            value = _image_to_string(value)
+        if isinstance(value, bytes):
+            with tf.io.gfile.GFile(dst, 'wb') as fp:
+                fp.write(value)
+        elif isinstance(value, six.string_types):
+            with tf.io.gfile.GFile(value, 'rb') as src:
+                with tf.io.gfile.GFile(dst, 'wb') as fp:
+                    fp.write(src.read())
+        else:
+            raise TypeError(value)
+
+    def __delitem__(self, key):
+        tf.io.gfile.remove(self._path(key))
 
 
 class ZipMapping(collections.Mapping):
@@ -259,3 +376,152 @@ class FeatureMapping(collections.Mapping):
 
     def __len__(self):
         return sum(1 for _ in self.keys())
+
+
+class MappingConfig(tfds.core.BuilderConfig):
+    @property
+    def supervised_keys(self):
+        return None
+
+    @abc.abstractproperty
+    def features(self):
+        """dict of features (not including 'model_id')."""
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def lazy_mapping(self, dl_manager=None):
+        raise NotImplementedError
+
+    @contextlib.contextmanager
+    def cache_mapping(self, cache_dir, mode='r'):
+        import h5py
+        from shape_tfds.core import mapping
+        feature = tfds.core.features.FeaturesDict(self.features)
+        feature._set_top_level()
+        path = os.path.join(cache_dir, 'cache.h5')
+        if not tf.io.gfile.isdir(cache_dir):
+            tf.io.gfile.makedirs(cache_dir)
+        with h5py.File(path, mode=mode) as h5:
+            with mapping.FeatureMapping(feature, mapping.H5Mapping(h5)) as fm:
+                yield fm
+
+    def create_cache(
+            self, cache_dir, keys, dl_manager=None, overwrite=False):
+        with self.cache_mapping(cache_dir, mode='a') as cache:
+            if not overwrite:
+                model_ids = tuple(k for k in model_ids if k not in cache)
+            if len(model_ids) == 0:
+                return
+            with self.lazy_mapping(dl_manager) as src:
+                for k in tqdm.tqdm(model_ids, desc='creating cache'):
+                    cache[k] = src[k]
+
+
+class MappingBuilder(tfds.core.GeneratorBasedBuilder):
+    def __init__(self, from_cache=False, overwrite_cache=False, **kwargs):
+        self._from_cache = from_cache
+        self._overwrite_cache = overwrite_cache
+        super(MappingBuilder, self).__init__(**kwargs)
+
+    @abc.abstractproperty
+    def key(self):
+        raise NotImplementedError
+
+    @abc.abstractproperty
+    def key_feature(self):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def _load_split_keys(self, dl_manager):
+        raise NotImplementedError
+
+    @abc.abstractproperty
+    def citation(self):
+        raise NotImplementedError
+
+    @abc.abstractproperty
+    def urls(self):
+        raise NotImplementedError
+
+    def _info(self):
+        return tfds.core.DatasetInfo(
+            builder=self,
+            features=self.features,
+            citation=self.citation,
+            supervised_keys=self.builder_config.supervised_keys,
+            urls=self.urls,
+        )
+
+    @property
+    def features(self):
+        """features used in self._info."""
+        key = self.key
+        config = self.builder_config
+        features = config.features
+        assert(key not in features)
+        features[key] = self.key_feature
+        return tfds.core.features.FeaturesDict(features)
+
+    @property
+    def cache_dir(self):
+        head, tail = os.path.split(self.data_dir)
+        if 'incomplete' in tail:
+            tail = '.'.join(tail.split('.')[:-1])
+        return os.path.join(head, 'cache', tail)
+
+    def create_cache(self, keys=None, dl_manager=None):
+        self.builder_config.create_cache(
+            cache_dir=self.cache_dir,
+            keys=keys,
+            dl_manager=dl_manager,
+            overwrite=self._overwrite_cache)
+
+    def remove_cache(self):
+        tf.io.gfile.rmtree(self.cache_dir)
+
+    def _split_generators(self, dl_manager):
+        config = self.builder_config
+        keys = self._load_split_keys(dl_manager)
+        splits = sorted(keys.keys())
+
+        if self._from_cache:
+            self.create_cache(
+                dl_manager=dl_manager,
+                keys=np.concatenate([keys[s] for s in splits]))
+            mapping_fn = functools.partial(
+                config.cache_mapping, cache_dir=self.cache_dir, mode='r')
+        else:
+            mapping_fn = functools.partial(
+                config.lazy_mapping, dl_manager=dl_manager)
+
+        gens = [tfds.core.SplitGenerator(
+            name=split, num_shards=len(keys[split]) // 500 + 1,
+            gen_kwargs=dict(mapping_fn=mapping_fn, keys=keys[split]))
+                for split in splits]
+        # we add num_examples for better progress bar info
+        for gen in gens:
+            gen.split_info.statistics.num_examples = len(keys[gen.name])
+        return gens
+
+    def _generate_examples(self, keys, **kwargs):
+        # wraps _generate_example_data, adding model_id as a key if
+        # `self.version.implements(tfds.core.Experiment.S3)`
+        gen = self._generate_example_data(keys=keys, **kwargs)
+        if (
+                hasattr(self.version, 'implements') and
+                self.version.implements(tfds.core.Experiment.S3)):
+            gen = ((v[self.key], v) for v in gen)
+        return gen
+
+    def _generate_example_data(self, mapping_fn, keys):
+        key_str = self.key
+        with mapping_fn() as mapping:
+            for key in keys:
+                try:
+                    out = mapping[key]
+                    assert(key not in out)
+                    out[key_str] = key
+                    yield out
+                except Exception:
+                    logging.error('Error loading example %s' % key)
+                    raise

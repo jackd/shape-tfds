@@ -85,7 +85,7 @@ class FrustumVoxelConfig(base.ShapenetCoreConfig):
             synset_id=self.synset_id, resolution=self.resolution))
 
         # living dangerously
-        base_dl_manager = tfds.core.download.DownloadManager(
+        baseget_dl_manager = tfds.core.download.DownloadManager(
             download_dir=dl_manager._download_dir,
             extract_dir=dl_manager._extract_dir,
             manual_dir=dl_manager._manual_dir,
@@ -95,11 +95,11 @@ class FrustumVoxelConfig(base.ShapenetCoreConfig):
             dataset_name=base_builder.name, # different
         )
         if self._use_cached_voxels:
-            base_builder.create_cache(dl_manager=base_dl_manager)
+            base_builder.create_cache(dl_manager=baseget_dl_manager)
             context = base_builder.builder_config.cache_mapping(
                 base_builder.cache_dir, 'r')
         else:
-            context = base_builder.builder_config.lazy_mapping(base_dl_manager)
+            context = base_builder.builder_config.lazy_mapping(baseget_dl_manager)
         with context as src:
             yield ItemMappedMapping(src, item_map_fn)
 

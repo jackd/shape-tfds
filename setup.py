@@ -8,6 +8,8 @@ with open('requirements.txt') as fp:
 DATASET_FILES = [
       'url_checksums/*',
       'shape/shapenet/core/core_synset.txt',
+      'shape/modelnet/class_names10.txt',
+      'shape/modelnet/class_names40.txt',
 ]
 
 
