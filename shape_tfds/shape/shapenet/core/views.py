@@ -8,6 +8,11 @@ from collection_utils.mapping import Mapping
 import functools
 import collections
 
+# default field-of-view in blender
+# consistent with R2n2
+# looks decent
+DEFAULT_FOV = np.degrees(2*np.arctan(32. / 35))
+
 
 def polar_to_cartesian(dist, theta, phi):
     """
@@ -65,43 +70,9 @@ def get_random_camera_position(
     )
 
 
-def get_random_views(
-        random=np.random,
-        focal=32./35,
-        dist=1.166,
-        theta=(0., 360.),
-        phi=(60., 65.),
-        num_views=None):
-    """
-    Get a random view(s).
-
-    Args:
-        random: np.random or np.random.RandomState instance.
-        dist: distance
-        theta: angle away from the positive x axis, or tuple of
-            (theta_min, theta_max) from which to sample uniformly
-        phi: angle away from the z axis, or tuple of (phi_min, phi_max) from
-            which to sample uniformly.
-        focal: dimensionless focal length, or tuple of (focal_min, focal_max)
-        num_views: int, number of views.
-
-    Returns:
-        dict containing 'position', 'focal' keys.
-            position: (num_views, 3) or (3,), float
-            focal: (num_views, 2) or (2,), dimensionless focal length
-                must be multiplied by resolution for equivalence to
-                `trimesh.Camera.focal`.
-    """
-
-    position = get_random_camera_position(
-        random, dist=dist, theta=theta, phi=phi, num_views=num_views)
-    focal = get_random(random, focal, size=num_views)
-    return dict(position=position, focal=focal)
-
-
 def random_view_fn(seed_offset=0, **kwargs):
     """
-    Get a mapping from given keys to a dict with 'position', 'focal' keys.
+    Get a mapping from given keys to a dict with camera positions.
 
     The mapping is deterministic but random, with a new random state used with
     seed given by `(zlib.adler32(key) + seed_offset) % (2 ** 32)`.
@@ -118,9 +89,9 @@ def random_view_fn(seed_offset=0, **kwargs):
     def get_views(key, num_views=None):
         import zlib
         seed = (zlib.adler32(str.encode(key)) + seed_offset) % (2 ** 32)
-        return get_random_views(
+        return get_random_camera_position(
             random=np.random.RandomState(seed),  # pylint: disable=no-member
-            num_views=None,
+            num_views=num_views,
             **kwargs)
 
     return get_views
@@ -134,12 +105,12 @@ def random_view_fn(seed_offset=0, **kwargs):
 #         camera=camera, camera_transform=transformations.look_at(position))
 
 
-def set_scene_view(scene, resolution, position, focal):
+def set_scene_view(scene, resolution, position, fov=(DEFAULT_FOV,)*2):
     resolution = np.array(resolution)
     camera = scene.camera
     camera.resolution = resolution
     scene.camera_transform = transformations.look_at(position)
-    camera.focal = focal*resolution
+    camera.fov = fov
 
 
 _axes_fix_transform = np.array([

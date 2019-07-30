@@ -51,9 +51,9 @@ class PaddedTensor(features.FeatureConnector):
   def encode_example(self, example_data):
     if self._strip_fn is not None and isinstance(example_data, np.ndarray):
         example_data = self._strip_fn(example_data)
-    return util.flatten_dicts(dict(
+    return dict(
       stripped=self._stripped.encode_example(example_data['stripped']),
-      padding=self._padding.encode_example(example_data['padding'])))
+      padding=self._padding.encode_example(example_data['padding']))
 
   def get_serialized_info(self):
     return util.flatten_dicts(dict(

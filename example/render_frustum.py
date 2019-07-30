@@ -12,7 +12,7 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 import numpy as np
 
-flags.DEFINE_string('name', default='suitcase', help='synset name')
+flags.DEFINE_string('synset', default='suitcase', help='synset name')
 flags.DEFINE_integer('vox_res', default=32, help='voxel resolution')
 flags.DEFINE_integer('image_res', default=128, help='voxel resolution')
 flags.DEFINE_integer('seed', default=0, help='seed to use for random_view_fn')
@@ -23,7 +23,7 @@ def main(_):
     tf.compat.v1.enable_eager_execution()
     FLAGS = flags.FLAGS
     ids, names = core.load_synset_ids()
-    name = FLAGS.name
+    name = FLAGS.synset
     seed = FLAGS.seed
 
     synset_id = name if name in names else ids[name]
@@ -31,9 +31,9 @@ def main(_):
         raise ValueError('Invalid synset_id %s' % synset_id)
 
     configs = dict(
-        image=core.ShapenetCoreRenderingsConfig(
+        image=core.TrimeshRenderingConfig(
             synset_id=synset_id, resolution=(FLAGS.image_res,)*2, seed=seed),
-        voxels=core.ShapenetCoreFrustumVoxelConfig(
+        voxels=core.FrustumVoxelConfig(
             synset_id=synset_id, resolution=FLAGS.vox_res, seed=seed))
     builders = {k: core.ShapenetCore(config=config)
                 for k, config in configs.items()}
@@ -49,6 +49,8 @@ def main(_):
                 tf.expand_dims(tf.cast(voxels, tf.uint8), axis=-1),
                 image.shape[:2], method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
             voxels = tf.cast(tf.squeeze(voxels, axis=-1), tf.bool).numpy()
+            # voxels = voxels.T
+            # voxels = voxels[:, -1::-1]
             image[np.logical_not(voxels)] = 0
             plt.imshow(image)
             plt.show()

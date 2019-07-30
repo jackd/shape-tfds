@@ -7,11 +7,11 @@ from absl import flags
 import tensorflow as tf
 from shape_tfds.shape.shapenet import core
 
-flags.DEFINE_string('name', default='suitcase', help='synset name')
+flags.DEFINE_string('synset', default='suitcase', help='synset name')
 flags.DEFINE_integer('resolution', default=32, help='voxel resolution')
 flags.DEFINE_boolean(
-    'from_file_mapping', default=False,
-    help='create tfrecords data from file mapping')
+    'from_cache', default=False,
+    help='create tfrecords data from cache')
 flags.DEFINE_boolean('vis', default=False, help='visualize on finish')
 
 
@@ -19,25 +19,18 @@ def main(_):
     tf.compat.v1.enable_eager_execution()
     FLAGS = flags.FLAGS
     ids, names = core.load_synset_ids()
-    name = FLAGS.name
+    name = FLAGS.synset
 
     synset_id = name if name in names else ids[name]
     if synset_id not in names:
         raise ValueError('Invalid synset_id %s' % synset_id)
 
     resolution = FLAGS.resolution
-    # name = 'watercraft'
-    # name = 'aeroplane'
-    # name = 'table'
-    # name = 'rifle'
 
-    config = core.ShapenetCoreVoxelConfig(
-        synset_id=ids[name], resolution=resolution,
-        from_file_mapping=FLAGS.from_file_mapping)
-    builder = core.ShapenetCore(config=config)
+    config = core.VoxelConfig(synset_id=ids[name], resolution=resolution)
+    builder = core.ShapenetCore(config=config, from_cache=FLAGS.from_cache)
     builder.download_and_prepare()
     dataset = builder.as_dataset(split='train')
-
 
     if FLAGS.vis:
         def vis(voxels):

@@ -14,7 +14,7 @@ names = ('suitcase', 'telephone', 'table')
 ids, _ = core.load_synset_ids()
 
 
-configs = (core.ShapenetCoreVoxelConfig(ids[n], resolution) for n in names)
+configs = (core.VoxelConfig(ids[n], resolution) for n in names)
 builders = tuple(
     core.ShapenetCore(config=config) for config in configs)
 

@@ -40,11 +40,11 @@ def vis(image, voxels):
 synset_id = ids[synset_name]
 
 configs = dict(
-    image=core.ShapenetCoreRenderingsConfig(
+    image=core.TrimeshRenderingConfig(
         synset_id=synset_id,
         resolution=resolution,
         view_fn=core.views.random_view_fn(seed_offset)),
-    voxels=core.ShapenetCoreVoxelConfig(synset_id, resolution=32))
+    voxels=core.VoxelConfig(synset_id, resolution=32))
 builders = {k: core.ShapenetCore(config=config)
             for k, config in configs.items()}
 for b in builders.values():

@@ -3,6 +3,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import contextlib
 import os
 import time
 import numpy as np
@@ -43,11 +44,13 @@ def _get_voxel_transform(resolution):
     ])
 
 
-class ShapenetCoreFrustumVoxelConfig(base.ShapenetCoreConfig):
-    def __init__(self, synset_id, resolution=64, seed=0):
+class FrustumVoxelConfig(base.ShapenetCoreConfig):
+    def __init__(
+            self, synset_id, resolution=64, seed=0, use_cached_voxels=True):
         self._seed = seed
         self._resolution = resolution
-        super(ShapenetCoreFrustumVoxelConfig, self).__init__(
+        self._use_cached_voxels = use_cached_voxels
+        super(FrustumVoxelConfig, self).__init__(
             synset_id=synset_id,
             name='frustum_voxels-%d-%s-%d' % (resolution, synset_id, seed),
             description='shapenet core frustum voxels',
@@ -61,7 +64,12 @@ class ShapenetCoreFrustumVoxelConfig(base.ShapenetCoreConfig):
     def resolution(self):
         return self._resolution
 
-    def loader(self, dl_manager=None):
+    @contextlib.contextmanager
+    def lazy_mapping(self, dl_manager=None):
+        from collection_utils.mapping import ItemMappedMapping
+        if dl_manager is None:
+            dl_manager = tfds.core.download.DownloadManager(
+                download_dir=base.DOWNLOADS_DIR)
         view_fn = views.random_view_fn(seed_offset=self._seed)
         transform = _get_voxel_transform(self._resolution)
 
@@ -71,22 +79,34 @@ class ShapenetCoreFrustumVoxelConfig(base.ShapenetCoreConfig):
             scene = trimesh.primitives.Sphere().scene()
             return dict(voxels=transform_voxels(
                 scene, voxels,
-                self._resolution, **view_fn(key)))
+                self._resolution, position=view_fn(key)))
 
-        return base.get_data_mapping_context(
-            config=voxel_lib.ShapenetCoreVoxelConfig(
-                synset_id=self.synset_id, resolution=self.resolution),
-            dl_manager=dl_manager, item_map_fn=item_map_fn)
+        base_builder = base.ShapenetCore(config=voxel_lib.VoxelConfig(
+            synset_id=self.synset_id, resolution=self.resolution))
 
-        # return base.mesh_loader_context(
-        #     synset_id=self.synset_id, dl_manager=dl_manager,
-        #     item_map_fn=lambda key, scene: dict(
-        #         voxels=load_frustum_voxels_dense(
-        #             scene, self._resolution, **view_fn(key))))
+        # living dangerously
+        base_dl_manager = tfds.core.download.DownloadManager(
+            download_dir=dl_manager._download_dir,
+            extract_dir=dl_manager._extract_dir,
+            manual_dir=dl_manager._manual_dir,
+            force_download=dl_manager._force_download,
+            force_extraction=dl_manager._force_extraction,
+            register_checksums=dl_manager._register_checksums,
+            dataset_name=base_builder.name, # different
+        )
+        if self._use_cached_voxels:
+            base_builder.create_cache(dl_manager=base_dl_manager)
+            context = base_builder.builder_config.cache_mapping(
+                base_builder.cache_dir, 'r')
+        else:
+            context = base_builder.builder_config.lazy_mapping(base_dl_manager)
+        with context as src:
+            yield ItemMappedMapping(src, item_map_fn)
 
 
-def transform_voxels(scene, voxels, resolution, position, focal):
-    views.set_scene_view(scene, (resolution,)*2, position, focal)
+def transform_voxels(scene, voxels, resolution, position):
+    views.fix_axes(voxels)
+    views.set_scene_view(scene, (resolution,)*2, position)
     dist = np.linalg.norm(position)
     origin, rays = scene.camera_rays()
     rays = rays.reshape((resolution, resolution, 3))
@@ -97,8 +117,3 @@ def transform_voxels(scene, voxels, resolution, position, focal):
     frust_vox_dense = voxels.is_filled(coords)
     frust_vox_dense = frust_vox_dense.transpose((1, 0, 2))  # y, x, z  # pylint: disable=no-member
     return frust_vox_dense
-
-
-def load_frustum_voxels_dense(scene, resolution, position, focal):
-    vox = voxel_lib.scene_to_voxels(scene, resolution)
-    return transform_voxels(scene, vox, resolution, position, focal)

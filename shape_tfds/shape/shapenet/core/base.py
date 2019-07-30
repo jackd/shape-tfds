@@ -4,6 +4,7 @@ from __future__ import print_function
 
 import abc
 from absl import logging
+import numpy as np
 import tensorflow as tf
 import tensorflow_datasets.public_api as tfds
 import tqdm
@@ -20,14 +21,37 @@ import functools
 from collection_utils.mapping import Mapping
 from collection_utils.iterable import single
 
+DOWNLOADS_DIR = os.path.join(tfds.core.constants.DATA_DIR, 'downloads')
+
 _bad_ids = {
     '04090263': (
         '4a32519f44dc84aabafe26e2eb69ebf4',  # empty
     ),
-    '02691156': (
-        'b644db95fe32d115d8d90babf3c5509a',  # too big
-    )
+    # '02958343': (
+    #     'e23ae6404dae972093c80fb5c792f223',  # too big
+    # )  # resolved in fix/objvert
 }
+
+
+class ImmutableMapping(collections.Mapping):
+    def __init__(self, base_mapping):
+        self._base = base_mapping
+
+    def __getitem__(self, key):
+        return self._base[key]
+
+    def __iter__(self):
+        return iter(self._base)
+
+    def __len__(self):
+        return len(self._base)
+
+    def __contains__(self, key):
+        return key in self._base
+
+
+id_sets = ImmutableMapping({'bad_ids': ImmutableMapping(_bad_ids)})
+
 
 SHAPENET_CITATION = """\
 @article{chang2015shapenet,
@@ -42,18 +66,6 @@ SHAPENET_CITATION = """\
 """
 
 SHAPENET_URL = "https://www.shapenet.org/"
-
-
-# class LengthedGenerator(object):
-#     def __init__(self, generator, length):
-#         self._generator = generator
-#         self._length = length
-
-#     def __len__(self):
-#         return self._length
-
-#     def __iter__(self):
-#         return iter(self._generator)
 
 
 def as_mesh(scene_or_mesh):
@@ -94,6 +106,45 @@ def zipped_mesh_loader(zipfile):
             return trimesh.load(fp, file_type='obj', resolver=resolver)
 
     return Mapping.mapped(keys, load_fn)
+
+
+class Openable(object):
+    """
+    Base class for classes which can be used as context managers.
+
+    Implement `_open` and `_close`.
+    """
+    def __init__(self):
+        self._is_open = False
+
+    def _open(self):
+        pass
+
+    def _close(self):
+        pass
+
+    @property
+    def is_open(self):
+        return self._is_open
+
+    def open(self):
+        if self.is_open:
+            raise ValueError('Already open')
+        self._open()
+        self._is_open = True
+
+    def close(self):
+        if not self.is_open:
+            raise ValueError('Already closed')
+        self._close()
+        self._is_open = False
+
+    def __enter__(self):
+        self.open()
+        return self
+
+    def __exit__(self, type, value, traceback):
+        self.close()
 
 
 class MappedFileContext(object):
@@ -177,14 +228,12 @@ def load_synset_ids():
             synset_names[id_] = names
             for n in names:
                 synset_ids[n] = id_
+    # repeated synset ids
+    ambiguous_ids = {'bench': '02828884'}
+    for k, v in ambiguous_ids.items():
+        assert(k in synset_names[v])
+        synset_ids[k] = v
     return synset_ids, synset_names
-
-
-def load_id_sets(key='bad_ids'):
-    if key == 'bad_ids':
-        return _bad_ids
-    else:
-        raise KeyError('Invalid key "%s"' % key)
 
 
 BASE_URL = 'http://shapenet.cs.stanford.edu/shapenet/obj-zip'
@@ -226,15 +275,15 @@ def _load_splits_ids(path, excluded):
 
 
 def _dl_manager():
-    return tfds.core.download.DownloadManager(
-        download_dir=os.path.join(tfds.core.constants.DATA_DIR, 'downloads'))
+    return tfds.core.download.DownloadManager(download_dir=DOWNLOADS_DIR)
 
 
 def load_split_ids(dl_manager=None, excluded='bad_ids'):
     dl_manager = dl_manager or _dl_manager()
-    if excluded == 'bad_ids':
-        excluded = _bad_ids
-    return _load_splits_ids(dl_manager.download(SPLIT_URL), excluded)
+
+    return _load_splits_ids(
+        dl_manager.download(SPLIT_URL),
+        None if excluded is None else id_sets[excluded])
 
 
 def load_taxonomy(dl_manager=None):
@@ -267,65 +316,64 @@ class ShapenetCoreConfig(tfds.core.BuilderConfig):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def loader(self, dl_manager=None):
+    def lazy_mapping(self, dl_manager=None):
         raise NotImplementedError
 
-
-def get_data_mapping_context(
-        config, data_dir=None, dl_manager=None, overwrite=False,
-        item_map_fn=None):
-    import h5py
-    from shape_tfds.core import mapping
-    import tqdm
-    if data_dir is None:
-        data_dir = os.path.join(
-            tfds.core.constants.DATA_DIR, 'shapenet_core',
-            'mappings', config.name, str(config.version))
-    data_dir = os.path.expanduser(data_dir)
-    if not tf.io.gfile.isdir(data_dir):
-        tf.io.gfile.makedirs(data_dir)
-    path = os.path.join(data_dir, 'mapping.h5')
-
-    def file_map_fn(fp, mode='r'):
-        h5 = h5py.File(fp, mode=mode)
-        feature = tfds.core.features.FeaturesDict(config.features)
+    @contextlib.contextmanager
+    def cache_mapping(self, cache_dir, mode='r'):
+        import h5py
+        from shape_tfds.core import mapping
+        feature = tfds.core.features.FeaturesDict(self.features)
         feature._set_top_level()
-        feature_mapping = mapping.FeatureMapping(
-            feature, mapping.H5Mapping(h5))
-        if item_map_fn is not None:
-            from collection_utils.mapping import ItemMappedMapping
-            return (
-                ItemMappedMapping(feature_mapping, item_map_fn),
-                feature_mapping)
-        else:
-            return feature_mapping, feature_mapping
+        path = os.path.join(cache_dir, 'cache.h5')
+        if not tf.io.gfile.isdir(cache_dir):
+            tf.io.gfile.makedirs(cache_dir)
+        with h5py.File(path, mode=mode) as h5:
+            with mapping.FeatureMapping(feature, mapping.H5Mapping(h5)) as fm:
+                yield fm
 
-    if not tf.io.gfile.exists(path) or overwrite:
-        try:
-            with h5py.File(path, 'w') as h5:
-                feature = tfds.core.features.FeaturesDict(config.features)
-                feature._set_top_level()
-                dst = mapping.FeatureMapping(feature, mapping.H5Mapping(h5))
-                with config.loader_context(dl_manager) as src:
-                    for k, v in tqdm.tqdm(
-                            src.items(),
-                            total=len(src),
-                            desc='Creating data mapping for %s' % config.name):
-                        dst[k] = v
-        except (Exception, KeyboardInterrupt):
-            if tf.io.gfile.exists(path):
-                tf.io.gfile.remove(path)
-            raise
-
-    return MappedFileContext(
-        path, file_map_fn,
-        on_open=lambda loader: loader.open(),
-        on_close=lambda loader: loader.close())
+    def create_cache(
+            self, cache_dir, model_ids=None, dl_manager=None, overwrite=False):
+        if model_ids is None:
+            model_ids = load_split_ids(dl_manager)[self.synset_id]
+            model_ids = np.concatenate(
+                [model_ids[k] for k in ('test', 'train', 'validation')])
+        with self.cache_mapping(cache_dir, mode='a') as cache:
+            if not overwrite:
+                model_ids = tuple(k for k in model_ids if k not in cache)
+            if len(model_ids) == 0:
+                return
+            with self.lazy_mapping(dl_manager) as src:
+                for k in tqdm.tqdm(model_ids, desc='creating cache'):
+                    cache[k] = src[k]
 
 
 class ShapenetCore(tfds.core.GeneratorBasedBuilder):
+    def __init__(self, from_cache=False, overwrite_cache=False, **kwargs):
+        self._from_cache = from_cache
+        self._overwrite_cache = overwrite_cache
+        super(ShapenetCore, self).__init__(**kwargs)
+
+    @property
+    def cache_dir(self):
+        head, tail = os.path.split(self.data_dir)
+        if 'incomplete' in tail:
+            tail = '.'.join(tail.split('.')[:-1])
+        return os.path.join(head, 'cache', tail)
+
+    def create_cache(self, model_ids=None, dl_manager=None):
+        self.builder_config.create_cache(
+            cache_dir=self.cache_dir,
+            model_ids=model_ids,
+            dl_manager=dl_manager,
+            overwrite=self._overwrite_cache)
+
+    def remove_cache(self):
+        tf.io.gfile.rmtree(self.cache_dir)
+
     def _info(self):
         features = self.builder_config.features
+        assert('model_id' not in features)
         features['model_id'] = tfds.core.features.Text()
         return tfds.core.DatasetInfo(
             builder=self,
@@ -344,49 +392,46 @@ class ShapenetCore(tfds.core.GeneratorBasedBuilder):
         else:
             raise NotImplementedError
         splits = sorted(model_ids.keys())
-        loader = config.loader(dl_manager=dl_manager)
+
+        if self._from_cache:
+            self.create_cache(
+                dl_manager=dl_manager,
+                model_ids=np.concatenate([model_ids[s] for s in splits]))
+            mapping_fn = functools.partial(
+                config.cache_mapping, cache_dir=self.cache_dir, mode='r')
+        else:
+            mapping_fn = functools.partial(
+                config.lazy_mapping, dl_manager=dl_manager)
 
         gens = [tfds.core.SplitGenerator(
             name=split, num_shards=len(model_ids[split]) // 500 + 1,
-            gen_kwargs=dict(loader=loader, model_ids=model_ids[split]))
+            gen_kwargs=dict(mapping_fn=mapping_fn, model_ids=model_ids[split]))
                 for split in splits]
         # we add num_examples for better progress bar info
-        # this may cause issues if not every model generates an example
         for gen in gens:
-            gen.split_info.statistics.num_examples = len(
-                model_ids[gen.name])
+            gen.split_info.statistics.num_examples = len(model_ids[gen.name])
         return gens
 
     def _generate_examples(self, model_ids, **kwargs):
+        # wraps _generate_example_data, adding model_id as a key if
+        # `self.version.implements(tfds.core.Experiment.S3)`
         gen = self._generate_example_data(model_ids=model_ids, **kwargs)
         if (
                 hasattr(self.version, 'implements') and
                 self.version.implements(tfds.core.Experiment.S3)):
             gen = ((v['model_id'], v) for v in gen)
-        # return LengthedGenerator(gen, len(model_ids))
         return gen
 
-    def _generate_example_data(self, loader, model_ids):
-        if hasattr(loader, '__enter__'):
-            with loader as loader:
-                for example in self._generate_example_data_with_loader(
-                        loader, model_ids):
-                    yield example
-        else:
-            for example in self._generate_example_data_with_loader(
-                    loader, model_ids):
-                yield example
-
-    def _generate_example_data_with_loader(self, loader, model_ids):
+    def _generate_example_data(self, mapping_fn, model_ids):
+        with mapping_fn() as mapping:
             for model_id in model_ids:
                 try:
-                    example_data = loader[model_id]
+                    out = mapping[model_id]
+                    assert('model_id' not in out)
+                    out['model_id'] = model_id
+                    yield out
                 except Exception:
                     logging.error(
                         'Error loading example %s / %s' %
                         (self.builder_config.synset_id, model_id))
                     raise
-                if example_data is not None:
-                    assert('model_id' not in example_data)
-                    example_data['model_id'] = model_id
-                    yield example_data

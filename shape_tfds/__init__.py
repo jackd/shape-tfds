@@ -20,9 +20,11 @@ except AttributeError:
 del os, tfds
 
 from shape_tfds import core
+from shape_tfds import rendering
 from shape_tfds import shape
 
 __all__ = [
     'core',
     'shape',
+    'rendering',
 ]

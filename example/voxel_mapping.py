@@ -13,7 +13,7 @@ name = 'suitcase'
 # name = 'table'
 # name = 'rifle'
 
-config = core.ShapenetCoreVoxelConfig(synset_id=ids[name], resolution=32)
+config = core.VoxelConfig(synset_id=ids[name], resolution=32)
 mapping_context = core.get_data_mapping_context(config)
 
 

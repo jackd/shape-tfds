@@ -13,6 +13,7 @@ blender --background --python blender_render.py -- \
 Original source:
 https://github.com/panmari/stanford-shapenet-renderer
 """
+import numpy as np
 import os
 import bpy    # pylint: disable=import-error
 
@@ -134,18 +135,6 @@ def remove_obj(objs):
         bpy.ops.object.delete()
 
 
-# def parent_obj_to_camera(b_camera):
-#     origin = (0, 0, 0)
-#     b_empty = bpy.data.objects.new("Empty", None)
-#     b_empty.location = origin
-#     b_camera.parent = b_empty  # setup parenting
-#
-#     scn = bpy.context.scene
-#     scn.objects.link(b_empty)
-#     scn.objects.active = b_empty
-#     return b_empty
-
-
 def load_camera_positions(path):
     import numpy as np
     if path.endswith('.txt'):
@@ -169,20 +158,15 @@ def load_render_params(path):
 
 
 def main(
-        out_dir, filename_format, obj_path, camera_positions,
-        resolution, scale, depth_scale, remove_doubles, edge_split, f):
-    if filename_format.endswith('.png'):
-        filename_format = filename_format[:-4]
-
+        out_dir, obj_path, camera_positions,
+        resolution, scale, depth_scale, remove_doubles, edge_split, fov,
+        filename_format,
+        include_depth, include_normals, include_albedo):
     assert(isinstance(obj_path, str))
     assert(obj_path.endswith('.obj'))
     assert(os.path.isfile(obj_path))
 
     camera_positions = load_camera_positions(camera_positions)
-    if f != 32 / 35:
-        raise NotImplementedError(
-            'Only default focal length of 32 / 35 implemented')
-
     invariants, depthFileOutput, normalFileOutput, albedoFileOutput = setup(
         depth_scale)
     empty = bpy.data.objects.new("Empty", None)
@@ -195,14 +179,17 @@ def main(
     scene.render.resolution_percentage = 100
     scene.render.alpha_mode = 'TRANSPARENT'
     cam = scene.objects['Camera']
+    cam.data.angle = np.radians(fov)
     # b_empty = parent_obj_to_camera(cam)
 
     # invariants.add(b_empty)
-    outputs = {
-        'depth': depthFileOutput,
-        'normal': normalFileOutput,
-        'albedo': albedoFileOutput
-    }
+    outputs = {}
+    if include_depth:
+        outputs['depth'] = depthFileOutput
+    if include_normals:
+        outputs['normals'] = normalFileOutput
+    if include_albedo:
+        outputs['albedo'] = albedoFileOutput
 
     def set_camera(eye):
         cam.location = eye
@@ -211,27 +198,28 @@ def main(
         cam_constraint.up_axis = 'UP_Y'
         cam_constraint.target = empty
 
-
-    eyes = camera_positions
     load_obj(obj_path, scale, remove_doubles, edge_split, invariants)
     # set output format to png
     scene.render.image_settings.file_format = 'PNG'
 
-    for output_node in [
-            depthFileOutput, normalFileOutput, albedoFileOutput]:
+    for output_node in outputs.values():
         output_node.base_path = ''
 
     if not os.path.isdir(out_dir):
         os.makedirs(out_dir)
 
-    for i, eye in enumerate(eyes):
-        set_camera(eye)
-        base_path = os.path.join(out_dir, filename_format % (i, ''))
-        scene.render.filepath = base_path
+    for i, camera_position in enumerate(camera_positions):
+        set_camera(camera_position)
+        scene.render.filepath = os.path.join(
+            out_dir, filename_format.format(output='render', index=i))
         for k, v in outputs.items():
-            filename = filename_format % (i, k)
-            v.file_slots[0].path = os.path.join(out_dir, filename)
-        bpy.ops.render.render(write_still=True)  # render still
+            v.file_slots[0].path = os.path.join(out_dir, filename_format.format(k, i))
+        bpy.ops.render.render(write_still=True)
+        # remove trailing 001 in filnemaes
+        for k in outputs:
+            os.rename(
+                os.path.join(out_dir, '%s-%03d0001.png' % (k, i)),
+                os.path.join(out_dir, '%s-%03d.png' % (k, i)))
 
 
 def get_args():
@@ -242,9 +230,6 @@ def get_args():
     parser.add_argument(
         '--render_params', type=str, help='path to json render_params file')
     parser.add_argument('--out_dir', type=str, help='output directory')
-    parser.add_argument(
-        '--filename_format', type=str, default='r%03%s',
-        help='output directory')
     parser.add_argument('--obj', type=str, help='path to obj file')
     parser.add_argument(
         '--camera_positions', type=str,
@@ -258,9 +243,21 @@ def get_args():
     parser.add_argument('--remove_doubles', type=bool, default=False)
     parser.add_argument('--edge_split', type=bool, default=False)
     parser.add_argument(
-        '--focal_length', '-f', help='dimensionless focal_length')
+        '--fov', '-f', default=30., type=float, help='field of view in degrees')
+    parser.add_argument(
+        '--albedo', '-a', action='store_true',
+        help='whether or not to save albedo')
+    parser.add_argument(
+        '--depth', '-d', action='store_true',
+        help='whether or not to save depth map')
+    parser.add_argument(
+        '--normals', '-n', action='store_true',
+        help='whether or not to save normals')
+    parser.add_argument(
+        '--filename_format', default='{output}-{index:03d}.png',
+        help='format of filename')
 
-    argv = sys.argv[sys.argv.index("--") + 1:]
+    argv = sys.argv[sys.argv.index('--') + 1:]
     args = parser.parse_args(argv)
 
     return args
@@ -268,6 +265,7 @@ def get_args():
 
 args = get_args()
 main(
-    args.out_dir, args.filename_format, args.obj,
+    args.out_dir, args.obj,
     args.camera_positions, args.resolution, args.scale, args.depth_scale,
-    args.remove_doubles, args.edge_split, args.focal_length)
+    args.remove_doubles, args.edge_split, args.fov, args.filename_format,
+    args.depth, args.normals, args.albedo)
