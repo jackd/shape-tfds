@@ -10,6 +10,7 @@ from tensorflow_datasets.core import features
 from collection_utils import mapping
 from shape_tfds.shape.shapenet.core import base
 from shape_tfds.shape.shapenet.core import views
+from shape_tfds.core.mapping import concat_dict_values
 
 
 class CameraPositionConfig(base.ShapenetCoreConfig):
@@ -29,7 +30,7 @@ class CameraPositionConfig(base.ShapenetCoreConfig):
     @contextlib.contextmanager
     def lazy_mapping(self, dl_manager=None):
         model_ids = base.load_split_ids(dl_manager)[self.synset_id]
-        model_ids = np.concatenate([model_ids[k] for k in sorted(model_ids)])
+        model_ids = concat_dict_values(model_ids)
         yield mapping.LazyMapping(
             model_ids, lambda model_id: dict(
                 camera_position=self.camera_position(model_id)))

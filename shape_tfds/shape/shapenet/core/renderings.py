@@ -79,10 +79,9 @@ class Renderer(object):
         raise NotImplementedError
 
     def create_multi_cache(
-            self, synset_id, seeds, keys, dl_manager=None,
-            overwrite=False):
-        model_ids = keys
-        del keys
+            self, synset_id, seeds, dl_manager=None, overwrite=False):
+        model_ids = shape_mapping.concat_dict_values(
+            base.load_split_ids(dl_manager)[synset_id])
         cache_mappings = []
         view_fns = []
         for seed in seeds:
@@ -92,8 +91,7 @@ class Renderer(object):
             view_fns.append(views.random_view_fn(seed))
         if model_ids is None:
             model_ids = base.load_split_ids(dl_manager=dl_manager)[synset_id]
-            model_ids = np.concatenate(
-                [model_ids[k] for k in sorted(model_ids)])
+            model_ids = shape_mapping.concat_dict_values(model_ids)
         if not overwrite:
             model_ids = [
                 m for m in model_ids if not all(
@@ -223,11 +221,9 @@ class RenderingConfig(base.ShapenetCoreConfig):
             self._cache_mapping(cache_dir),
             lambda image: dict(image=image))
 
-    def create_cache(
-            self, cache_dir, keys, dl_manager=None,
-            overwrite=False):
+    def create_cache(self, cache_dir, dl_manager=None, overwrite=False):
         # WARNING: slow if you want to create multiple view caches
         # use Renderer.create_multi_cache with multiple seeds
         self._renderer.create_multi_cache(
-            self.synset_id, keys=keys, seeds=(self.seed,),
+            self.synset_id, seeds=(self.seed,),
             dl_manager=None, overwrite=False)

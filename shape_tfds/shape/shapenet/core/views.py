@@ -7,6 +7,7 @@ from shape_tfds.shape import transformations
 from collection_utils.mapping import Mapping
 import functools
 import collections
+from shape_tfds.core import random as rand
 
 # default field-of-view in blender
 # consistent with R2n2
@@ -87,10 +88,8 @@ def random_view_fn(seed_offset=0, **kwargs):
             raise ValueError('Invalid kwarg key "%s"' % key)
 
     def get_views(key, num_views=None):
-        import zlib
-        seed = (zlib.adler32(str.encode(key)) + seed_offset) % (2 ** 32)
         return get_random_camera_position(
-            random=np.random.RandomState(seed),  # pylint: disable=no-member
+            random=rand.get_random_state(key, seed_offset),  # pylint: disable=no-member
             num_views=num_views,
             **kwargs)
 

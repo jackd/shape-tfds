@@ -219,7 +219,6 @@ def load_synset_ids():
         synset_ids[k] = v
     return synset_ids, synset_names
 
-
 BASE_URL = 'http://shapenet.cs.stanford.edu/shapenet/obj-zip'
 DL_URL = '%s/ShapeNetCore.v1/{synset_id}.zip' % BASE_URL
 SPLIT_URL = '%s/SHREC16/all.csv' % BASE_URL

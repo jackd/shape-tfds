@@ -7,6 +7,7 @@ from absl import flags
 import tensorflow as tf
 import tensorflow_datasets as tfds
 from shape_tfds.shape.shapenet import core
+from shape_tfds.core.mapping import concat_dict_values
 
 import tensorflow as tf
 import matplotlib.pyplot as plt
@@ -30,7 +31,8 @@ def main(_):
     renderer = core.Renderer.named(
         name=FLAGS.renderer, resolution=(FLAGS.resolution,)*2)
     renderer.create_multi_cache(
-        synset_id, seeds=range(FLAGS.num_seeds))
+        synset_id, seeds=range(FLAGS.num_seeds),
+        keys=concat_dict_values(core.load_split_ids()[synset_id]))
 
 
 if __name__ == '__main__':

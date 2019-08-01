@@ -9,20 +9,26 @@ import tensorflow_datasets as tfds
 from shape_tfds.shape.modelnet import base
 
 
-class ModelnetSampledConfig(tfds.core.BuilderConfig):
-    num_points = 10000
+class ModelnetSampledConfig(base.CloudNormalConfig):
 
-    def __init__(self, num_classes, name_prefix="c"):
+    def __init__(self, num_classes):
         """num_classes must be 10 or 40."""
         assert(num_classes in (10, 40))
-        self.num_classes = num_classes
+        num_points = 10000
         super(ModelnetSampledConfig, self).__init__(
-                name="%s%d" % (name_prefix, num_classes),
+                name="presampled%d-%d" % (num_classes, num_points),
+                num_points=num_points,
                 description=(
-                    "%d-class sampled 1000-point cloud used by PointNet++"
+                    "%d-class sampled 10000-point cloud used by PointNet++"
                     % num_classes),
-                version=tfds.core.utils.Version(0, 0, 1)
-        )
+                version=tfds.core.utils.Version(0, 0, 1))
+
+    @property
+    def num_classes(self):
+        return self._nun_classes
+
+    def load_example(self, path):
+        raise NotImplementedError
 
 
 class ModelnetSampled(tfds.core.GeneratorBasedBuilder):
@@ -44,21 +50,18 @@ class ModelnetSampled(tfds.core.GeneratorBasedBuilder):
         example_index = tfds.features.Tensor(shape=(), dtype=tf.int64)
         class_names_path = base.get_class_names_path(self.num_classes)
         label = tfds.features.ClassLabel(names_file=class_names_path)
-        features = tfds.features.FeaturesDict({
-            "cloud": {
-                "positions": tfds.features.Tensor(
-                    shape=(10000, 3), dtype=tf.float32),
-                "normals": tfds.features.Tensor(
-                    shape=(10000, 3), dtype=tf.float32)
-            },
+        features = {
             "label": label,
             "example_index": example_index,
-        })
-        supervised_keys = ("cloud", "label")
+        }
+        inp_key, inp_feature = self.builder_config.feature_item
+        features[inp_key] = inp_feature
+
+        supervised_keys = (inp_key, "label")
 
         return tfds.core.DatasetInfo(
             builder=self,
-            features=features,
+            features=tfds.core.features.FeaturesDict(features),
             citation=self._CITATION,
             supervised_keys=supervised_keys,
             urls=self.URLS,

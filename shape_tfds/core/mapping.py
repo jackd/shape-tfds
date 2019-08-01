@@ -406,15 +406,19 @@ class MappingConfig(tfds.core.BuilderConfig):
                 yield fm
 
     def create_cache(
-            self, cache_dir, keys, dl_manager=None, overwrite=False):
+            self, cache_dir, dl_manager=None, overwrite=False):
         with self.cache_mapping(cache_dir, mode='a') as cache:
             if not overwrite:
-                model_ids = tuple(k for k in model_ids if k not in cache)
-            if len(model_ids) == 0:
+                keys = tuple(k for k in keys if k not in cache)
+            if len(keys) == 0:
                 return
             with self.lazy_mapping(dl_manager) as src:
-                for k in tqdm.tqdm(model_ids, desc='creating cache'):
+                for k in tqdm.tqdm(keys, desc='creating cache'):
                     cache[k] = src[k]
+
+
+def concat_dict_values(dictionary):
+    return np.concatenate([dictionary[k] for k in sorted(dictionary)])
 
 
 class MappingBuilder(tfds.core.GeneratorBasedBuilder):
@@ -469,10 +473,9 @@ class MappingBuilder(tfds.core.GeneratorBasedBuilder):
             tail = '.'.join(tail.split('.')[:-1])
         return os.path.join(head, 'cache', tail)
 
-    def create_cache(self, keys=None, dl_manager=None):
+    def create_cache(self, dl_manager=None):
         self.builder_config.create_cache(
             cache_dir=self.cache_dir,
-            keys=keys,
             dl_manager=dl_manager,
             overwrite=self._overwrite_cache)
 
@@ -485,9 +488,7 @@ class MappingBuilder(tfds.core.GeneratorBasedBuilder):
         splits = sorted(keys.keys())
 
         if self._from_cache:
-            self.create_cache(
-                dl_manager=dl_manager,
-                keys=np.concatenate([keys[s] for s in splits]))
+            self.create_cache(dl_manager=dl_manager)
             mapping_fn = functools.partial(
                 config.cache_mapping, cache_dir=self.cache_dir, mode='r')
         else:
@@ -504,7 +505,7 @@ class MappingBuilder(tfds.core.GeneratorBasedBuilder):
         return gens
 
     def _generate_examples(self, keys, **kwargs):
-        # wraps _generate_example_data, adding model_id as a key if
+        # wraps _generate_example_data, adding key if
         # `self.version.implements(tfds.core.Experiment.S3)`
         gen = self._generate_example_data(keys=keys, **kwargs)
         if (

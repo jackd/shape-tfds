@@ -10,6 +10,7 @@ import os
 
 import tensorflow_datasets as tfds
 from shape_tfds.shape.shapenet.core import base
+from shape_tfds.core.mapping import concat_dict_values
 import trimesh
 import numpy as np
 
@@ -17,8 +18,7 @@ flags.DEFINE_string('synset', help='synset name or id', default=None)
 
 
 def check_core_models(synset_id, model_ids):
-    model_ids = np.concatenate(
-        tuple(model_ids[k] for k in ('test', 'train', 'validation')))
+    model_ids = concat_dict_values(model_ids)
     bad_ids = []
     dl_manager = tfds.core.download.download_manager.DownloadManager(
         download_dir=os.path.join(tfds.core.constants.DATA_DIR, 'downloads'),

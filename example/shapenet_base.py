@@ -96,7 +96,6 @@ def vis(model_id, mesh_or_scene):
     plt.show()
 
 
-
 ids, names = load_synset_ids()
 with mesh_loader_context(ids[synset]) as loader:
     model_ids = sorted(loader)

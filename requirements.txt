@@ -5,3 +5,4 @@ git+git://github.com/jackd/collection-utils.git@master
 networkx
 git+git://github.com/mmatl/pyopengl.git
 pyrender
+scipy
