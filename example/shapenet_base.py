@@ -92,7 +92,7 @@ def vis(model_id, mesh_or_scene):
     plt.imshow(color)
     plt.subplot(1,2,2)
     plt.axis('off')
-    plt.imshow(depth, cmap=plt.cm.gray_r)
+    plt.imshow(depth, cmap=plt.cm.gray_r)  # pylint: disable=no-member
     plt.show()
 
 
