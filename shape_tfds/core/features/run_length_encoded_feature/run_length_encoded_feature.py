@@ -17,47 +17,50 @@ from trimesh.voxel import runlength as np_impl
 
 
 def _check_size(data_size, expected_size):
-  if expected_size is not None and data_size != expected_size:
-    raise ValueError(
-        "encoding size %d is incompatible with expected size %d"
-        % (data_size, expected_size))
+    if expected_size is not None and data_size != expected_size:
+        raise ValueError(
+            "encoding size %d is incompatible with expected size %d" %
+            (data_size, expected_size))
+
 
 def _check_dtype(dtype, expected_dtype):
-  if dtype != expected_dtype:
-    raise ValueError(
-      "dtype %s does not match expected %s" % (dtype, expected_dtype))
+    if dtype != expected_dtype:
+        raise ValueError("dtype %s does not match expected %s" %
+                         (dtype, expected_dtype))
 
 
 class RunLengthEncodedFeatureBase(features.FeatureConnector):
-  def __init__(self, size, dtype, serialized_dtype=tf.int64):
-    self._size = size
-    self._dtype = dtype
-    self._serialized_dtype = serialized_dtype
 
-  def get_serialized_info(self):
-    return features.TensorInfo(shape=(None,), dtype=self._serialized_dtype)
+    def __init__(self, size, dtype, serialized_dtype=tf.int64):
+        self._size = size
+        self._dtype = dtype
+        self._serialized_dtype = serialized_dtype
 
-  def get_tensor_info(self):
-    return features.TensorInfo(shape=(self._size,), dtype=self._dtype)
+    def get_serialized_info(self):
+        return features.TensorInfo(shape=(None,), dtype=self._serialized_dtype)
 
-  def _shaped(self, decoded):
-    if self._size is not None:
-      decoded.set_shape((self._size))
-    return decoded
+    def get_tensor_info(self):
+        return features.TensorInfo(shape=(self._size,), dtype=self._dtype)
+
+    def _shaped(self, decoded):
+        if self._size is not None:
+            decoded.set_shape((self._size))
+        return decoded
 
 
 class RunLengthEncodedFeature(RunLengthEncodedFeatureBase):
-  """`FeatureConnector` for run length encoded 1D tensors."""
-  def __init__(self, size=None, dtype=tf.int64, serialized_dtype=tf.int64):
-    super(RunLengthEncodedFeature, self).__init__(
-      size, dtype, serialized_dtype=serialized_dtype)
+    """`FeatureConnector` for run length encoded 1D tensors."""
 
-  def decode_example(self, tfexample_data):
-    out = self._shaped(tf_impl.rle_to_dense(tfexample_data))
-    return tf.cast(out, dtype=self._dtype)
+    def __init__(self, size=None, dtype=tf.int64, serialized_dtype=tf.int64):
+        super(RunLengthEncodedFeature,
+              self).__init__(size, dtype, serialized_dtype=serialized_dtype)
 
-  def encode_example(self, example_data):
-    """Encode the given example.
+    def decode_example(self, tfexample_data):
+        out = self._shaped(tf_impl.rle_to_dense(tfexample_data))
+        return tf.cast(out, dtype=self._dtype)
+
+    def encode_example(self, example_data):
+        """Encode the given example.
 
     Args:
       example_data: dense values to encode
@@ -69,24 +72,25 @@ class RunLengthEncodedFeature(RunLengthEncodedFeatureBase):
       `ValueError` if the input size is inconsistent with `size` provided in
       the constructor or the `example_data.dtype` is not int64.
     """
-    # only supports dense -> rle encoding
-    _check_dtype(example_data.dtype, self._dtype.as_numpy_dtype)
-    _check_size(example_data.size, self._size)
-    return np_impl.dense_to_rle(
-      example_data, dtype=self._serialized_dtype.as_numpy_dtype)
+        # only supports dense -> rle encoding
+        _check_dtype(example_data.dtype, self._dtype.as_numpy_dtype)
+        _check_size(example_data.size, self._size)
+        return np_impl.dense_to_rle(example_data,
+                                    dtype=self._serialized_dtype.as_numpy_dtype)
 
 
 class BinaryRunLengthEncodedFeature(RunLengthEncodedFeatureBase):
-  """`FeatureConnector` for binary run length encoded 1D tensors."""
-  def __init__(self, size=None, serialized_dtype=tf.int64):
-    super(BinaryRunLengthEncodedFeature, self).__init__(
-      size, tf.bool, serialized_dtype=serialized_dtype)
+    """`FeatureConnector` for binary run length encoded 1D tensors."""
 
-  def decode_example(self, tfexample_data):
-    return self._shaped(tf_impl.brle_to_dense(tfexample_data))
+    def __init__(self, size=None, serialized_dtype=tf.int64):
+        super(BinaryRunLengthEncodedFeature,
+              self).__init__(size, tf.bool, serialized_dtype=serialized_dtype)
 
-  def encode_example(self, example_data):
-    _check_dtype(example_data.dtype, self._dtype.as_numpy_dtype)
-    _check_size(example_data.size, self._size)
-    return np_impl.dense_to_brle(
-      example_data, dtype=self._serialized_dtype.as_numpy_dtype)
+    def decode_example(self, tfexample_data):
+        return self._shaped(tf_impl.brle_to_dense(tfexample_data))
+
+    def encode_example(self, example_data):
+        _check_dtype(example_data.dtype, self._dtype.as_numpy_dtype)
+        _check_size(example_data.size, self._size)
+        return np_impl.dense_to_brle(
+            example_data, dtype=self._serialized_dtype.as_numpy_dtype)

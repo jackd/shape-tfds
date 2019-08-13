@@ -17,9 +17,7 @@ def BinaryVoxel(shape):
     """
     if not isinstance(shape, tuple):
         raise ValueError('shape must be a tuple, got %s' % str(shape))
-    return sds.core.features.PaddedTensor(
-        sds.core.features.ShapedTensor(
-            sds.core.features.BinaryRunLengthEncodedFeature(
-                serialized_dtype=tf.uint8),
-            (None,)*len(shape)),
-        padded_shape=(shape))
+    return sds.core.features.PaddedTensor(sds.core.features.ShapedTensor(
+        sds.core.features.BinaryRunLengthEncodedFeature(
+            serialized_dtype=tf.uint8), (None,) * len(shape)),
+                                          padded_shape=(shape))

@@ -18,17 +18,18 @@ trimesh.util.log.setLevel('ERROR')
 
 
 class VoxelConfig(base.ShapenetCoreConfig):
+
     def __init__(self, synset_id, resolution=64):
         self._resolution = resolution
-        super(VoxelConfig, self).__init__(
-            name='voxel-%s-%d' % (synset_id, resolution),
-            description='shapenet core voxels',
-            version=tfds.core.Version("0.0.1"),
-            synset_id=synset_id)
+        super(VoxelConfig,
+              self).__init__(name='voxel-%s-%d' % (synset_id, resolution),
+                             description='shapenet core voxels',
+                             version=tfds.core.Version("0.0.1"),
+                             synset_id=synset_id)
 
     @property
     def features(self):
-        return dict(voxels=BinaryVoxel(shape=(self._resolution,)*3))
+        return dict(voxels=BinaryVoxel(shape=(self._resolution,) * 3))
 
     @property
     def resolution(self):
@@ -37,9 +38,11 @@ class VoxelConfig(base.ShapenetCoreConfig):
     @contextlib.contextmanager
     def lazy_mapping(self, dl_manager=None):
         import trimesh
-        binvoxer = trimesh.exchange.binvox.Binvoxer(
-            exact=True, dimension=self._resolution,
-            bounding_box=(-0.5, -0.5, -0.5, 0.5, 0.5, 0.5))
+        binvoxer = trimesh.exchange.binvox.Binvoxer(exact=True,
+                                                    dimension=self._resolution,
+                                                    bounding_box=(-0.5, -0.5,
+                                                                  -0.5, 0.5,
+                                                                  0.5, 0.5))
 
         def map_fn(obj_path):
             binvox_path = binvoxer(obj_path)

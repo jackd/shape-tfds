@@ -14,9 +14,11 @@ from shape_tfds.core.mapping import concat_dict_values
 
 
 class CameraPositionConfig(base.ShapenetCoreConfig):
+
     def __init__(self, synset_id, seed=0, **kwargs):
-        super(CameraPositionConfig, self).__init__(
-            synset_id=synset_id, name='camera-positions%d' % seed)
+        super(CameraPositionConfig,
+              self).__init__(synset_id=synset_id,
+                             name='camera-positions%d' % seed)
         self._seed = seed
         self._view_fn = views.random_view_fn(seed)
 
@@ -32,8 +34,8 @@ class CameraPositionConfig(base.ShapenetCoreConfig):
         model_ids = base.load_split_ids(dl_manager)[self.synset_id]
         model_ids = concat_dict_values(model_ids)
         yield mapping.LazyMapping(
-            model_ids, lambda model_id: dict(
-                camera_position=self.camera_position(model_id)))
+            model_ids, lambda model_id: dict(camera_position=self.
+                                             camera_position(model_id)))
 
     def features(self):
         return dict(

@@ -30,24 +30,27 @@ def main(_):
     if synset_id not in names:
         raise ValueError('Invalid synset_id %s' % synset_id)
 
-    configs = dict(
-        image=core.TrimeshRenderingConfig(
-            synset_id=synset_id, resolution=(FLAGS.image_res,)*2, seed=seed),
-        voxels=core.FrustumVoxelConfig(
-            synset_id=synset_id, resolution=FLAGS.vox_res, seed=seed))
-    builders = {k: core.ShapenetCore(config=config)
-                for k, config in configs.items()}
+    configs = dict(image=core.TrimeshRenderingConfig(
+        synset_id=synset_id, resolution=(FLAGS.image_res,) * 2, seed=seed),
+                   voxels=core.FrustumVoxelConfig(synset_id=synset_id,
+                                                  resolution=FLAGS.vox_res,
+                                                  seed=seed))
+    builders = {
+        k: core.ShapenetCore(config=config) for k, config in configs.items()
+    }
     for b in builders.values():
         b.download_and_prepare()
 
     if FLAGS.vis:
+
         def vis(example):
             import matplotlib.pyplot as plt
             image = example['image'].numpy()
             voxels = tf.reduce_any(example['voxels'], axis=-1)
             voxels = tf.image.resize(
                 tf.expand_dims(tf.cast(voxels, tf.uint8), axis=-1),
-                image.shape[:2], method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+                image.shape[:2],
+                method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
             voxels = tf.cast(tf.squeeze(voxels, axis=-1), tf.bool).numpy()
             # voxels = voxels.T
             # voxels = voxels[:, -1::-1]
@@ -56,8 +59,10 @@ def main(_):
             plt.show()
 
         datasets = {
-            k: b.as_dataset(split='train', shuffle_files=False).map(
-                lambda x: x[k]) for k, b in builders.items()}
+            k: b.as_dataset(split='train',
+                            shuffle_files=False).map(lambda x: x[k])
+            for k, b in builders.items()
+        }
         dataset = tf.data.Dataset.zip(datasets)
         for example in dataset:
             vis(example)

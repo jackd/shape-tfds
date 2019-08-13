@@ -15,7 +15,7 @@ https://github.com/panmari/stanford-shapenet-renderer
 """
 import numpy as np
 import os
-import bpy    # pylint: disable=import-error
+import bpy  # pylint: disable=import-error
 
 
 def setup(depth_scale):
@@ -123,8 +123,7 @@ def load_obj(path, scale, remove_doubles, edge_split, invariants):
         if edge_split:
             bpy.ops.object.modifier_add(type='EDGE_SPLIT')
             bpy.context.object.modifiers["EdgeSplit"].split_angle = 1.32645
-            bpy.ops.object.modifier_apply(
-                apply_as='DATA', modifier="EdgeSplit")
+            bpy.ops.object.modifier_apply(apply_as='DATA', modifier="EdgeSplit")
 
     return objs
 
@@ -142,8 +141,7 @@ def load_camera_positions(path):
     elif path.endswith('.npy'):
         return np.load(path)
     else:
-        raise IOError(
-            'Unrecognized extension for camera_positions %s' % path)
+        raise IOError('Unrecognized extension for camera_positions %s' % path)
 
 
 def load_render_params(path):
@@ -151,20 +149,18 @@ def load_render_params(path):
     if path is None:
         return {}
     else:
-        assert(isinstance(path, str))
-        assert(path.endswith('.json'))
+        assert (isinstance(path, str))
+        assert (path.endswith('.json'))
         with open(path, 'r') as fp:
             return json.load(fp)
 
 
-def main(
-        out_dir, obj_path, camera_positions,
-        resolution, scale, depth_scale, remove_doubles, edge_split, fov,
-        filename_format,
-        include_depth, include_normals, include_albedo):
-    assert(isinstance(obj_path, str))
-    assert(obj_path.endswith('.obj'))
-    assert(os.path.isfile(obj_path))
+def main(out_dir, obj_path, camera_positions, resolution, scale, depth_scale,
+         remove_doubles, edge_split, fov, filename_format, include_depth,
+         include_normals, include_albedo):
+    assert (isinstance(obj_path, str))
+    assert (obj_path.endswith('.obj'))
+    assert (os.path.isfile(obj_path))
 
     camera_positions = load_camera_positions(camera_positions)
     invariants, depthFileOutput, normalFileOutput, albedoFileOutput = setup(
@@ -213,13 +209,13 @@ def main(
         scene.render.filepath = os.path.join(
             out_dir, filename_format.format(output='render', index=i))
         for k, v in outputs.items():
-            v.file_slots[0].path = os.path.join(out_dir, filename_format.format(k, i))
+            v.file_slots[0].path = os.path.join(out_dir,
+                                                filename_format.format(k, i))
         bpy.ops.render.render(write_still=True)
         # remove trailing 001 in filnemaes
         for k in outputs:
-            os.rename(
-                os.path.join(out_dir, '%s-%03d0001.png' % (k, i)),
-                os.path.join(out_dir, '%s-%03d.png' % (k, i)))
+            os.rename(os.path.join(out_dir, '%s-%03d0001.png' % (k, i)),
+                      os.path.join(out_dir, '%s-%03d.png' % (k, i)))
 
 
 def get_args():
@@ -227,35 +223,47 @@ def get_args():
     import sys
     parser = argparse.ArgumentParser(
         description='Renders given obj file by rotation a camera around it.')
-    parser.add_argument(
-        '--render_params', type=str, help='path to json render_params file')
+    parser.add_argument('--render_params',
+                        type=str,
+                        help='path to json render_params file')
     parser.add_argument('--out_dir', type=str, help='output directory')
     parser.add_argument('--obj', type=str, help='path to obj file')
-    parser.add_argument(
-        '--camera_positions', type=str,
-        help='path to camera_positions npy file')
-    parser.add_argument(
-        '--resolution', '-r', type=int, nargs=2, default=(128, 128),
-        help='(ry, rx)')
+    parser.add_argument('--camera_positions',
+                        type=str,
+                        help='path to camera_positions npy file')
+    parser.add_argument('--resolution',
+                        '-r',
+                        type=int,
+                        nargs=2,
+                        default=(128, 128),
+                        help='(ry, rx)')
     parser.add_argument('--scale', type=float, default=1.0, help='scale')
-    parser.add_argument(
-        '--depth_scale', type=float, default=1.4, help='depth scale')
+    parser.add_argument('--depth_scale',
+                        type=float,
+                        default=1.4,
+                        help='depth scale')
     parser.add_argument('--remove_doubles', type=bool, default=False)
     parser.add_argument('--edge_split', type=bool, default=False)
-    parser.add_argument(
-        '--fov', '-f', default=30., type=float, help='field of view in degrees')
-    parser.add_argument(
-        '--albedo', '-a', action='store_true',
-        help='whether or not to save albedo')
-    parser.add_argument(
-        '--depth', '-d', action='store_true',
-        help='whether or not to save depth map')
-    parser.add_argument(
-        '--normals', '-n', action='store_true',
-        help='whether or not to save normals')
-    parser.add_argument(
-        '--filename_format', default='{output}-{index:03d}.png',
-        help='format of filename')
+    parser.add_argument('--fov',
+                        '-f',
+                        default=30.,
+                        type=float,
+                        help='field of view in degrees')
+    parser.add_argument('--albedo',
+                        '-a',
+                        action='store_true',
+                        help='whether or not to save albedo')
+    parser.add_argument('--depth',
+                        '-d',
+                        action='store_true',
+                        help='whether or not to save depth map')
+    parser.add_argument('--normals',
+                        '-n',
+                        action='store_true',
+                        help='whether or not to save normals')
+    parser.add_argument('--filename_format',
+                        default='{output}-{index:03d}.png',
+                        help='format of filename')
 
     argv = sys.argv[sys.argv.index('--') + 1:]
     args = parser.parse_args(argv)
@@ -264,8 +272,6 @@ def get_args():
 
 
 args = get_args()
-main(
-    args.out_dir, args.obj,
-    args.camera_positions, args.resolution, args.scale, args.depth_scale,
-    args.remove_doubles, args.edge_split, args.fov, args.filename_format,
-    args.depth, args.normals, args.albedo)
+main(args.out_dir, args.obj, args.camera_positions, args.resolution, args.scale,
+     args.depth_scale, args.remove_doubles, args.edge_split, args.fov,
+     args.filename_format, args.depth, args.normals, args.albedo)

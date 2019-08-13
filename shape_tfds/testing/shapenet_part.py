@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 r"""Generate shapenet-like files with random data."""
 
 from __future__ import absolute_import
@@ -35,9 +34,8 @@ from shape_tfds.shape.shapenet.part import PART_SYNSET_IDS
 from shape_tfds.shape.shapenet import part_test
 from tensorflow_datasets.core.utils import py_utils
 
-
-fake_examples_dir = os.path.join(
-        py_utils.tfds_dir(), "testing", "test_data", "fake_examples")
+fake_examples_dir = os.path.join(py_utils.tfds_dir(), "testing", "test_data",
+                                 "fake_examples")
 
 
 def make_part_data():
@@ -62,8 +60,8 @@ def make_part_data():
                 tf.io.gfile.makedirs(subdir)
             path = os.path.join(subdir, filename)
             n_points = np.random.randint(10) + 2
-            points = np.random.normal(size=n_points*3).reshape((n_points, 3))
-            normals = np.random.normal(size=n_points*3).reshape((n_points, 3))
+            points = np.random.normal(size=n_points * 3).reshape((n_points, 3))
+            normals = np.random.normal(size=n_points * 3).reshape((n_points, 3))
             normals /= np.linalg.norm(normals, axis=-1, keepdims=True)
             point_labels = np.random.randint(NUM_PART_CLASSES, size=n_points)
             data = np.empty((n_points, 7), dtype=np.float32)

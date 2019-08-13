@@ -6,6 +6,7 @@ import os
 
 
 class FolderCollection(collections.Collection):
+
     def __init__(self, directory):
         self._directory = directory
 

@@ -27,8 +27,7 @@ def load_off(file_obj):
     header_string = header_string.strip().upper()
 
     if not header_string.startswith('OFF'):
-        raise NameError('Not an OFF file! Header was ' +
-                        header_string)
+        raise NameError('Not an OFF file! Header was ' + header_string)
     if len(header_string) == 3:
         header_string = file_obj.readline().strip()
     else:
@@ -45,16 +44,13 @@ def load_off(file_obj):
     if not data_ok:
         raise NameError('Incorrect number of vertices or faces!')
 
-    vertices = blob[:(vertex_count * 3)].astype(
-        np.float64).reshape((-1, 3))
+    vertices = blob[:(vertex_count * 3)].astype(np.float64).reshape((-1, 3))
     # strip the first column which is a per- face count
-    faces = blob[(vertex_count * 3):].astype(
-        np.int64).reshape((-1, 4))[:, 1:]
+    faces = blob[(vertex_count * 3):].astype(np.int64).reshape((-1, 4))[:, 1:]
 
     if face_count != len(faces):
         raise ValueError(
-            'Inconsistent number of faces vs header spec, %d vs %d'
-            % (len(faces, face_count)))
+            'Inconsistent number of faces vs header spec, %d vs %d' %
+            (len(faces, face_count)))
 
-    return {'vertices': vertices,
-            'faces': faces}
+    return {'vertices': vertices, 'faces': faces}

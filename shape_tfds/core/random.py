@@ -9,7 +9,7 @@ import zlib
 
 def get_random_seed(key, seed_offset=0):
     """Get a deterministic seed from key and seed_offset."""
-    return (zlib.adler32(str.encode(key)) + seed_offset) % (2 ** 32)
+    return (zlib.adler32(str.encode(key)) + seed_offset) % (2**32)
 
 
 def get_random_state(key, seed_offset=0):

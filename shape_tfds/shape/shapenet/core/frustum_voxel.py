@@ -17,7 +17,6 @@ import trimesh
 
 trimesh.util.log.setLevel('ERROR')
 
-
 # def frustum_matrix(near, far, left, right, bottom, top):
 #     # http://www.songho.ca/opengl/gl_projectionmatrix.html
 #     return np.array([
@@ -27,7 +26,6 @@ trimesh.util.log.setLevel('ERROR')
 #         [0, 0, -1, 0],
 #     ])
 
-
 # def symmetric_frustum_matrix(near, far, width, height):
 #     dx = width / 2
 #     dy = height / 2
@@ -36,17 +34,14 @@ trimesh.util.log.setLevel('ERROR')
 
 def _get_voxel_transform(resolution):
     diag = 1 / (resolution - 1)
-    return np.array([
-        [diag, 0, 0, -0.5],
-        [0, diag, 0, -0.5],
-        [0, 0, diag, -0.5],
-        [0, 0, 0, 1]
-    ])
+    return np.array([[diag, 0, 0, -0.5], [0, diag, 0, -0.5], [0, 0, diag, -0.5],
+                     [0, 0, 0, 1]])
 
 
 class FrustumVoxelConfig(base.ShapenetCoreConfig):
-    def __init__(
-            self, synset_id, resolution=64, seed=0, use_cached_voxels=True):
+
+    def __init__(self, synset_id, resolution=64, seed=0,
+                 use_cached_voxels=True):
         self._seed = seed
         self._resolution = resolution
         self._use_cached_voxels = use_cached_voxels
@@ -58,7 +53,7 @@ class FrustumVoxelConfig(base.ShapenetCoreConfig):
 
     @property
     def features(self):
-        return dict(voxels=BinaryVoxel((self._resolution,)*3))
+        return dict(voxels=BinaryVoxel((self._resolution,) * 3))
 
     @property
     def resolution(self):
@@ -73,12 +68,11 @@ class FrustumVoxelConfig(base.ShapenetCoreConfig):
         transform = _get_voxel_transform(self._resolution)
 
         def item_map_fn(key, data):
-            voxels = trimesh.voxel.VoxelGrid(
-                data['voxels'], transform=transform)
+            voxels = trimesh.voxel.VoxelGrid(data['voxels'],
+                                             transform=transform)
             scene = trimesh.primitives.Sphere().scene()
             return dict(voxels=transform_voxels(
-                scene, voxels,
-                self._resolution, position=view_fn(key)))
+                scene, voxels, self._resolution, position=view_fn(key)))
 
         base_builder = base.ShapenetCore(config=voxel_lib.VoxelConfig(
             synset_id=self.synset_id, resolution=self.resolution))
@@ -91,7 +85,7 @@ class FrustumVoxelConfig(base.ShapenetCoreConfig):
             force_download=dl_manager._force_download,
             force_extraction=dl_manager._force_extraction,
             register_checksums=dl_manager._register_checksums,
-            dataset_name=base_builder.name, # different
+            dataset_name=base_builder.name,  # different
         )
         if self._use_cached_voxels:
             base_builder.create_cache(dl_manager=base_dl_manager)
@@ -105,7 +99,7 @@ class FrustumVoxelConfig(base.ShapenetCoreConfig):
 
 def transform_voxels(scene, voxels, resolution, position):
     views.fix_axes(voxels)
-    views.set_scene_view(scene, (resolution,)*2, position)
+    views.set_scene_view(scene, (resolution,) * 2, position)
     dist = np.linalg.norm(position)
     origin, rays = scene.camera_rays()
     rays = rays.reshape((resolution, resolution, 3))

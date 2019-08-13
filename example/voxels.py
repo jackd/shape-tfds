@@ -9,9 +9,9 @@ from shape_tfds.shape.shapenet import core
 
 flags.DEFINE_string('synset', default='suitcase', help='synset name')
 flags.DEFINE_integer('resolution', default=32, help='voxel resolution')
-flags.DEFINE_boolean(
-    'from_cache', default=False,
-    help='create tfrecords data from cache')
+flags.DEFINE_boolean('from_cache',
+                     default=False,
+                     help='create tfrecords data from cache')
 flags.DEFINE_boolean('vis', default=False, help='visualize on finish')
 
 
@@ -33,6 +33,7 @@ def main(_):
     dataset = builder.as_dataset(split='train')
 
     if FLAGS.vis:
+
         def vis(voxels):
             # visualize a single image/voxel pair
             import matplotlib.pyplot as plt

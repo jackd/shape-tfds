@@ -14,9 +14,8 @@ synset_name = 'suitcase'
 # name = 'aeroplane'
 # name = 'table'
 # name = 'rifle'
-resolution = (128,)*2
+resolution = (128,) * 2
 ny, nx = resolution
-
 
 
 def vis(image, voxels):
@@ -39,23 +38,23 @@ def vis(image, voxels):
 
 synset_id = ids[synset_name]
 
-configs = dict(
-    image=core.TrimeshRenderingConfig(
-        synset_id=synset_id,
-        resolution=resolution,
-        view_fn=core.views.random_view_fn(seed_offset)),
-    voxels=core.VoxelConfig(synset_id, resolution=32))
-builders = {k: core.ShapenetCore(config=config)
-            for k, config in configs.items()}
+configs = dict(image=core.TrimeshRenderingConfig(
+    synset_id=synset_id,
+    resolution=resolution,
+    view_fn=core.views.random_view_fn(seed_offset)),
+               voxels=core.VoxelConfig(synset_id, resolution=32))
+builders = {
+    k: core.ShapenetCore(config=config) for k, config in configs.items()
+}
 for b in builders.values():
     b.download_and_prepare()
 
 datasets = {
-    k: b.as_dataset(split='train', shuffle_files=False).map(
-        lambda x: x[k]) for k, b in builders.items()}
+    k: b.as_dataset(split='train', shuffle_files=False).map(lambda x: x[k])
+    for k, b in builders.items()
+}
 
 dataset = tf.data.Dataset.zip(datasets)
-
 
 for example in dataset:
     image = example['image'].numpy()

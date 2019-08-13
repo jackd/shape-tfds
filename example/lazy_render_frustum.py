@@ -19,7 +19,7 @@ def main(_):
     import os
     from trimesh.util import BytesIO
     synset = FLAGS.synset
-    resolution = (FLAGS.resolution,)*2
+    resolution = (FLAGS.resolution,) * 2
     renderer = core.Renderer.named(FLAGS.renderer, resolution=resolution)
 
     ids, _ = core.load_synset_ids()
@@ -27,8 +27,9 @@ def main(_):
     resolution = 128
 
     config = core.RenderingConfig(synset_id, renderer)
-    frustum_config = core.FrustumVoxelConfig(
-        synset_id, resolution=resolution, use_cached_voxels=False)
+    frustum_config = core.FrustumVoxelConfig(synset_id,
+                                             resolution=resolution,
+                                             use_cached_voxels=False)
     with config.lazy_mapping() as renderings:
         with frustum_config.lazy_mapping() as voxels:
             for k in renderings:

@@ -27,12 +27,12 @@ def main(_):
     if synset_id not in names:
         raise ValueError('Invalid synset_id %s' % synset_id)
 
-    builder = core.ShapenetCore(
-            config=core.FrustumVoxelConfig(
+    builder = core.ShapenetCore(config=core.FrustumVoxelConfig(
         synset_id=synset_id, resolution=FLAGS.resolution, seed=FLAGS.seed))
     builder.download_and_prepare()
 
     if FLAGS.vis:
+
         def vis(example):
             import matplotlib.pyplot as plt
             # This import registers the 3D projection, but is otherwise unused.

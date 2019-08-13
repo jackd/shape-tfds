@@ -7,8 +7,9 @@ import os
 
 
 class ZipSubdirResolver(trimesh.visual.resolvers.Resolver):
+
     def __init__(self, archive, subdir):
-        assert(hasattr(archive, 'read'))
+        assert (hasattr(archive, 'read'))
         self.archive = archive
         self.subdir = subdir
 

@@ -40,7 +40,7 @@ LABEL_SPLITS = (
 def part_class_indices(object_class_index):
     return range(
         LABEL_SPLITS[object_class_index],
-        LABEL_SPLITS[object_class_index+1],
+        LABEL_SPLITS[object_class_index + 1],
     )
 
 
@@ -53,7 +53,6 @@ _CITATION = """\
 }"""
 
 _ICCV2017_URL = "https://shapenet.cs.stanford.edu/iccv17/"
-
 
 PART_SYNSET_IDS = (
     '02691156',
@@ -78,13 +77,13 @@ _part_synset_index = {k: i for i, k in enumerate(PART_SYNSET_IDS)}
 
 
 class ShapenetPart2017Config(tfds.core.BuilderConfig):
-    def __init__(
-            self,
-            name_prefix="base",
-            version=core_utils.Version("0.0.1"),
-            description=(
-                "point cloud segmentation dataset for iccv2017 challenge"),
-            synset=None):
+
+    def __init__(self,
+                 name_prefix="base",
+                 version=core_utils.Version("0.0.1"),
+                 description=(
+                     "point cloud segmentation dataset for iccv2017 challenge"),
+                 synset=None):
         if synset is None:
             synset_index = None
             synset_id = None
@@ -113,24 +112,21 @@ class ShapenetPart2017Config(tfds.core.BuilderConfig):
         self.synset_id = synset_id
         self.synset_index = synset_index
         description = '%s (%s)' % (description, synset)
-        super(ShapenetPart2017Config, self).__init__(
-            name=name, version=version, description=description)
+        super(ShapenetPart2017Config, self).__init__(name=name,
+                                                     version=version,
+                                                     description=description)
 
     @property
     def cloud_features(self):
         if self.synset_index is None:
             num_part_classes = NUM_PART_CLASSES
         else:
-            num_part_classes = (
-                LABEL_SPLITS[self.class_index+1] -
-                LABEL_SPLITS[self.class_index])
+            num_part_classes = (LABEL_SPLITS[self.class_index + 1] -
+                                LABEL_SPLITS[self.class_index])
         return tfds.features.Sequence({
-                "labels": tfds.features.ClassLabel(
-                    num_classes=num_part_classes),
-                "positions": tfds.features.Tensor(
-                    shape=(3,), dtype=tf.float32),
-                "normals": tfds.features.Tensor(
-                    shape=(3,), dtype=tf.float32)
+            "labels": tfds.features.ClassLabel(num_classes=num_part_classes),
+            "positions": tfds.features.Tensor(shape=(3,), dtype=tf.float32),
+            "normals": tfds.features.Tensor(shape=(3,), dtype=tf.float32)
         })
 
     def map_cloud(self, cloud):
@@ -158,14 +154,12 @@ class ShapenetPart2017(tfds.core.GeneratorBasedBuilder):
 
         description = "ICCV2017 point cloud segmentation challenge"
 
-        return tfds.core.DatasetInfo(
-                builder=self,
-                description=description,
-                features=features,
-                citation=_CITATION,
-                supervised_keys=("cloud", "label"),
-                urls=self.URLS
-        )
+        return tfds.core.DatasetInfo(builder=self,
+                                     description=description,
+                                     features=features,
+                                     citation=_CITATION,
+                                     supervised_keys=("cloud", "label"),
+                                     urls=self.URLS)
 
     def _split_generators(self, dl_manager):
         data_dir = dl_manager.download_and_extract(self._DL_URL)
@@ -175,16 +169,17 @@ class ShapenetPart2017(tfds.core.GeneratorBasedBuilder):
 
         out = []
         for split, key, num_shards in (
-                        (tfds.Split.TRAIN, "train", 16),
-                        (tfds.Split.VALIDATION, "val", 2),
-                        (tfds.Split.TEST, "test", 4),
-                ):
-            split_path = os.path.join(split_dir, "shuffled_%s_file_list.json" % key)
-            out.append(tfds.core.SplitGenerator(
-                        name=split,
-                        num_shards=num_shards,
-                        gen_kwargs=dict(
-                            split_path=split_path, data_dir=data_dir)))
+            (tfds.Split.TRAIN, "train", 16),
+            (tfds.Split.VALIDATION, "val", 2),
+            (tfds.Split.TEST, "test", 4),
+        ):
+            split_path = os.path.join(split_dir,
+                                      "shuffled_%s_file_list.json" % key)
+            out.append(
+                tfds.core.SplitGenerator(name=split,
+                                         num_shards=num_shards,
+                                         gen_kwargs=dict(split_path=split_path,
+                                                         data_dir=data_dir)))
         return out
 
     def _generate_examples(self, split_path, data_dir):
@@ -204,11 +199,12 @@ class ShapenetPart2017(tfds.core.GeneratorBasedBuilder):
                 data = np.loadtxt(fp, dtype=np.float32)
             positions, normals, labels = np.split(data, (3, 6), axis=1)  # pylint: disable=unbalanced-tuple-unpacking
             yield example_id, dict(
-                cloud=self.builder_config.map_cloud(dict(
-                    positions=positions,
-                    normals=normals,
-                    labels=labels.astype(np.int64) - label_offset,
-                )),
+                cloud=self.builder_config.map_cloud(
+                    dict(
+                        positions=positions,
+                        normals=normals,
+                        labels=labels.astype(np.int64) - label_offset,
+                    )),
                 label=synset_id,
                 example_id=example_id,
             )

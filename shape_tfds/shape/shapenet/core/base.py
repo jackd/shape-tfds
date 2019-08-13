@@ -32,10 +32,8 @@ _bad_ids = {
     # )  # resolved in fix/objvert
 }
 
-
 id_sets = shape_mapping.ImmutableMapping(
     {'bad_ids': shape_mapping.ImmutableMapping(_bad_ids)})
-
 
 SHAPENET_CITATION = """\
 @article{chang2015shapenet,
@@ -65,7 +63,8 @@ def as_mesh(scene_or_mesh):
         else:
             # we lose texture information here
             mesh = trimesh.util.concatenate(
-                tuple(trimesh.Trimesh(vertices=g.vertices, faces=g.faces)
+                tuple(
+                    trimesh.Trimesh(vertices=g.vertices, faces=g.faces)
                     for g in scene_or_mesh.geometry.values()))
     else:
         mesh = scene_or_mesh
@@ -77,8 +76,7 @@ def zipped_mesh_loader(zipfile):
     if len(namelist) == 0:
         raise ValueError('No entries in namelist')
     synset_id = namelist[0].split('/')[0]
-    keys = set(
-        n.split('/')[1] for n in namelist if n.endswith('.obj'))
+    keys = set(n.split('/')[1] for n in namelist if n.endswith('.obj'))
 
     def load_fn(key):
         from shape_tfds.core.resolver import ZipSubdirResolver
@@ -98,6 +96,7 @@ class Openable(object):
 
     Implement `_open` and `_close`.
     """
+
     def __init__(self):
         self._is_open = False
 
@@ -132,6 +131,7 @@ class Openable(object):
 
 
 class MappedFileContext(object):
+
     def __init__(self, path, map_fn, on_open=None, on_close=None):
         self._path = path
         self._map_fn = map_fn
@@ -174,14 +174,15 @@ def zipped_mesh_loader_context(synset_id, dl_manager=None, item_map_fn=None):
             scene.show()
     ```
     """
+
     def file_map_fn(fp):
         loader = zipped_mesh_loader(zipfile.ZipFile(fp))
         if item_map_fn is not None:
             loader = loader.item_map(item_map_fn)
         return loader, None
 
-    return MappedFileContext(
-        get_obj_zip_path(synset_id, dl_manager), map_fn=file_map_fn)
+    return MappedFileContext(get_obj_zip_path(synset_id, dl_manager),
+                             map_fn=file_map_fn)
 
 
 def extracted_mesh_paths(synset_id, dl_manager=None):
@@ -189,7 +190,7 @@ def extracted_mesh_paths(synset_id, dl_manager=None):
     zip_path = get_obj_zip_path(synset_id, dl_manager)
     root_dir = dl_manager.extract(zip_path)
     synset_dir = os.path.join(root_dir, synset_id)
-    assert(tf.io.gfile.isdir(synset_dir))
+    assert (tf.io.gfile.isdir(synset_dir))
     model_ids = tf.io.gfile.listdir(synset_dir)
     return Mapping.mapped(
         tuple(model_ids),
@@ -215,9 +216,10 @@ def load_synset_ids():
     # repeated synset ids
     ambiguous_ids = {'bench': '02828884'}
     for k, v in ambiguous_ids.items():
-        assert(k in synset_names[v])
+        assert (k in synset_names[v])
         synset_ids[k] = v
     return synset_ids, synset_names
+
 
 BASE_URL = 'http://shapenet.cs.stanford.edu/shapenet/obj-zip'
 DL_URL = '%s/ShapeNetCore.v1/{synset_id}.zip' % BASE_URL
@@ -244,8 +246,8 @@ def _load_splits_ids(path, excluded):
             if excluded and model_id in excluded.get(synset_id, ()):
                 continue
             del record_id, sub_synset_id
-            split_dicts.setdefault(synset_id, {}).setdefault(split, []).append(
-                model_id)
+            split_dicts.setdefault(synset_id,
+                                   {}).setdefault(split, []).append(model_id)
 
     for split_ids in split_dicts.values():
         if 'val' in split_ids:
@@ -260,9 +262,8 @@ def _load_splits_ids(path, excluded):
 def load_split_ids(dl_manager=None, excluded='bad_ids'):
     dl_manager = dl_manager or get_dl_manager()
 
-    return _load_splits_ids(
-        dl_manager.download(SPLIT_URL),
-        None if excluded is None else id_sets[excluded])
+    return _load_splits_ids(dl_manager.download(SPLIT_URL),
+                            None if excluded is None else id_sets[excluded])
 
 
 def load_taxonomy(dl_manager=None):
@@ -277,6 +278,7 @@ def get_obj_zip_path(synset_id, dl_manager=None):
 
 
 class ShapenetCoreConfig(shape_mapping.MappingConfig):
+
     def __init__(self, synset_id, **kwargs):
         self._synset_id = synset_id
         super(ShapenetCoreConfig, self).__init__(**kwargs)
@@ -287,6 +289,7 @@ class ShapenetCoreConfig(shape_mapping.MappingConfig):
 
 
 class ShapenetCore(shape_mapping.MappingBuilder):
+
     @property
     def key(self):
         return 'model_id'

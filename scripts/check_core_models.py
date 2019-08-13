@@ -22,25 +22,25 @@ def check_core_models(synset_id, model_ids):
     bad_ids = []
     dl_manager = tfds.core.download.download_manager.DownloadManager(
         download_dir=os.path.join(tfds.core.constants.DATA_DIR, 'downloads'),
-        register_checksums=True, dataset_name='shapenet_core')
+        register_checksums=True,
+        dataset_name='shapenet_core')
 
     # paths = base.extracted_mesh_paths(synset_id, dl_manager=dl_manager)
     # paths = base.extracted_mesh_paths(synset_id)
-    with base.zipped_mesh_loader_context(
-            synset_id, dl_manager=dl_manager) as loader:
+    with base.zipped_mesh_loader_context(synset_id,
+                                         dl_manager=dl_manager) as loader:
         for model_id in tqdm.tqdm(model_ids, desc='%s: ' % synset_id):
             try:
                 mesh_or_scene = loader[model_id]
-                if (
-                        isinstance(mesh_or_scene, trimesh.Scene) and
+                if (isinstance(mesh_or_scene, trimesh.Scene) and
                         len(tuple(mesh_or_scene.geometry)) == 0):
                     raise Exception('empty mesh')
 
             except Exception:
                 logging.info('Bad id: %s' % model_id)
                 bad_ids.append(model_id)
-        logging.info(
-            '%d bad ids found for synset %s' % (len(bad_ids), synset_id))
+        logging.info('%d bad ids found for synset %s' %
+                     (len(bad_ids), synset_id))
         logging.info(bad_ids)
 
 

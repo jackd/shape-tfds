@@ -45,8 +45,9 @@ def look_at_nh(eye, center=None, world_up=None, dtype=None):
 
 def _from_nh(R, t):
     return np.concatenate([
-        np.concatenate([R, np.expand_dims(t, axis=-1)], axis=-1),
-        [[0, 0, 0, 1]]], axis=0)
+        np.concatenate([R, np.expand_dims(t, axis=-1)], axis=-1), [[0, 0, 0, 1]]
+    ],
+                          axis=0)
 
 
 def look_at(eye, center=None, world_up=None, dtype=None):

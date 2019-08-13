@@ -15,13 +15,18 @@ BLENDER_RENDER_SCRIPT = os.path.join(
 BLENDER_PATH = find_executable('blender')
 
 
-def render(
-        obj_path, output_directory,
-        camera_positions, fov, resolution=(128, 128),
-        filename_format='{output:s}-{index:03d}.png',
-        script_path=BLENDER_RENDER_SCRIPT, blender_path=BLENDER_PATH,
-        include_depth=True, include_normals=True, include_albedo=True,
-        verbose=False):
+def render(obj_path,
+           output_directory,
+           camera_positions,
+           fov,
+           resolution=(128, 128),
+           filename_format='{output:s}-{index:03d}.png',
+           script_path=BLENDER_RENDER_SCRIPT,
+           blender_path=BLENDER_PATH,
+           include_depth=True,
+           include_normals=True,
+           include_albedo=True,
+           verbose=False):
     """
     Render the given obj file with blender.
 
@@ -60,15 +65,24 @@ def render(
         np.save(camera_positions_path, camera_positions)
         ry, rx = resolution
         args = [
-                blender_path, '--background',
-                '--python', script_path, '--',
-                '--obj', obj_path,
-                '--out_dir', output_directory,
-                # '--filename_format', filename_format,
-                '--camera_positions', camera_positions_path,
-                '--fov', str(fov),
-                '--resolution', str(ry), str(rx),
-                ]
+            blender_path,
+            '--background',
+            '--python',
+            script_path,
+            '--',
+            '--obj',
+            obj_path,
+            '--out_dir',
+            output_directory,
+            # '--filename_format', filename_format,
+            '--camera_positions',
+            camera_positions_path,
+            '--fov',
+            str(fov),
+            '--resolution',
+            str(ry),
+            str(rx),
+        ]
         if include_depth:
             args.append('-d')
         if include_normals:
@@ -107,9 +121,10 @@ if __name__ == '__main__':
     if os.path.isdir(output_directory):
         shutil.rmtree(output_directory)
     os.makedirs(output_directory)
-    rendered_path = render(
-        obj_path, output_directory, positions,
-        fov=views.DEFAULT_FOV,
-        include_normals=include_normals,
-        include_depth=include_depth,
-        include_albedo=include_albedo)
+    rendered_path = render(obj_path,
+                           output_directory,
+                           positions,
+                           fov=views.DEFAULT_FOV,
+                           include_normals=include_normals,
+                           include_depth=include_depth,
+                           include_albedo=include_albedo)

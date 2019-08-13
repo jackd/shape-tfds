@@ -13,10 +13,8 @@ split = 'train'
 names = ('suitcase', 'telephone', 'table')
 ids, _ = core.load_synset_ids()
 
-
 configs = (core.VoxelConfig(ids[n], resolution) for n in names)
-builders = tuple(
-    core.ShapenetCore(config=config) for config in configs)
+builders = tuple(core.ShapenetCore(config=config) for config in configs)
 
 all_fns = []
 for builder in builders:
@@ -24,7 +22,8 @@ for builder in builders:
     prefix = '%s-%s' % (builder.name.split('/')[0], split)
     data_dir = builder.data_dir
     record_fns = tuple(
-        os.path.join(data_dir, fn) for fn in os.listdir(data_dir)
+        os.path.join(data_dir, fn)
+        for fn in os.listdir(data_dir)
         if fn.startswith(prefix))
     all_fns.extend(record_fns)
 

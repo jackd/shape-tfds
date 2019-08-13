@@ -12,7 +12,7 @@ from shape_tfds.core import random as rand
 # default field-of-view in blender
 # consistent with R2n2
 # looks decent
-DEFAULT_FOV = np.degrees(2*np.arctan(32. / 35))
+DEFAULT_FOV = np.degrees(2 * np.arctan(32. / 35))
 
 
 def polar_to_cartesian(dist, theta, phi):
@@ -42,13 +42,14 @@ def get_random(random, value_or_range, size=None):
         return random.uniform(*value_or_range, size=size)
     if size is None:
         return value_or_range
-    return np.repeat(
-        np.expand_dims(value_or_range, axis=0), size, axis=0)
+    return np.repeat(np.expand_dims(value_or_range, axis=0), size, axis=0)
 
 
-def get_random_camera_position(
-        random=np.random, dist=1.166, theta=(0., 360.),
-        phi=(60., 65.), num_views=None):
+def get_random_camera_position(random=np.random,
+                               dist=1.166,
+                               theta=(0., 360.),
+                               phi=(60., 65.),
+                               num_views=None):
     """
     Get randomly sampled camera positions.
 
@@ -104,7 +105,7 @@ def random_view_fn(seed_offset=0, **kwargs):
 #         camera=camera, camera_transform=transformations.look_at(position))
 
 
-def set_scene_view(scene, resolution, position, fov=(DEFAULT_FOV,)*2):
+def set_scene_view(scene, resolution, position, fov=(DEFAULT_FOV,) * 2):
     resolution = np.array(resolution)
     camera = scene.camera
     camera.resolution = resolution
@@ -112,12 +113,8 @@ def set_scene_view(scene, resolution, position, fov=(DEFAULT_FOV,)*2):
     camera.fov = fov
 
 
-_axes_fix_transform = np.array([
-    [1, 0, 0, 0],
-    [0, 0, -1, 0],
-    [0, 1, 0, 0],
-    [0, 0, 0, 1]
-])
+_axes_fix_transform = np.array([[1, 0, 0, 0], [0, 0, -1, 0], [0, 1, 0, 0],
+                                [0, 0, 0, 1]])
 
 
 def fix_axes(geometry):

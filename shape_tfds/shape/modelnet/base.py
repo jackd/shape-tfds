@@ -55,7 +55,7 @@ def normalize_points(points):
     """
     radius, center = naive_bounding_sphere(points)
     points -= center
-    points /= 2*radius
+    points /= 2 * radius
 
 
 def get_modelnet10_data_dir(dl_manager=None):
@@ -73,12 +73,13 @@ def get_modelnet40_data_dir(dl_manager=None):
 
 
 def get_modelnet40_aligned_data_dir(dl_manager=None):
-    dl_manager = dl_manager or get_dl_manager(
-        dataset_name='modelnet40_aligned')
+    dl_manager = dl_manager or get_dl_manager(dataset_name='modelnet40_aligned')
     path = dl_manager.download(
-        "https://lmb.informatik.uni-freiburg.de/resources/datasets/ORION/modelnet40_manually_aligned.tar")
-    folder = dl_manager.extract(resource_lib.Resource(
-        path=path, extract_method=resource_lib.ExtractMethod.TAR_GZ))
+        "https://lmb.informatik.uni-freiburg.de/resources/datasets/ORION/modelnet40_manually_aligned.tar"
+    )
+    folder = dl_manager.extract(
+        resource_lib.Resource(path=path,
+                              extract_method=resource_lib.ExtractMethod.TAR_GZ))
     return folder
 
 
@@ -91,8 +92,8 @@ def get_data_dir_fn(name='modelnet40'):
 
 
 def get_class_names_path(num_classes):
-    return os.path.join(
-        os.path.dirname(__file__), 'class_names%d.txt' % num_classes)
+    return os.path.join(os.path.dirname(__file__),
+                        'class_names%d.txt' % num_classes)
 
 
 def load_class_names(num_classes):
@@ -105,14 +106,15 @@ def _load_split_paths(root_dir):
     out_paths = {'train': [], 'test': []}
     n = len(root_dir) + 1
     for dirname, _, fns in os.walk(root_dir):
-        paths = tuple(os.path.join(dirname[n:], fn)
-                      for fn in fns if fn.endswith('.off'))
+        paths = tuple(
+            os.path.join(dirname[n:], fn) for fn in fns if fn.endswith('.off'))
         if len(paths) > 0:
             out_paths[os.path.split(dirname)[1]].extend(paths)
     return out_paths
 
 
 class ModelnetConfig(tfds.core.BuilderConfig):
+
     @abc.abstractproperty
     def feature_item(self):
         raise NotImplementedError
@@ -123,6 +125,7 @@ class ModelnetConfig(tfds.core.BuilderConfig):
 
 
 class CloudConfig(ModelnetConfig):
+
     def __init__(self, num_points, name=None, version="0.0.1", **kwargs):
         self._num_points = num_points
         if name is None:
@@ -135,8 +138,8 @@ class CloudConfig(ModelnetConfig):
 
     @property
     def feature_item(self):
-        return 'positions', tfds.features.Tensor(
-            shape=(self.num_points, 3), dtype=tf.float32)
+        return 'positions', tfds.features.Tensor(shape=(self.num_points, 3),
+                                                 dtype=tf.float32)
 
     def load_example(self, path):
         import trimesh
@@ -146,18 +149,19 @@ class CloudConfig(ModelnetConfig):
         normalize_points(vertices)
         mesh = trimesh.Trimesh(**mesh_kwargs)
         with random_context(get_random_state(path)):
-            positions, _ = trimesh.sample.sample_surface(
-                mesh, self.num_points)
+            positions, _ = trimesh.sample.sample_surface(mesh, self.num_points)
         return positions.astype(np.float32)
 
 
 class CloudNormalConfig(ModelnetConfig):
+
     def __init__(self, num_points, name=None, version="0.0.1", **kwargs):
         self._num_points = num_points
         if name is None:
             name = 'cloud_normals-%d' % num_points
-        super(CloudNormalConfig, self).__init__(
-            name=name, version=version, **kwargs)
+        super(CloudNormalConfig, self).__init__(name=name,
+                                                version=version,
+                                                **kwargs)
 
     @property
     def num_points(self):
@@ -166,10 +170,12 @@ class CloudNormalConfig(ModelnetConfig):
     @property
     def feature_item(self):
         return 'cloud', {
-            'positions': tfds.features.Tensor(
-                    shape=(self.num_points, 3), dtype=tf.float32),
-            'normals': tfds.features.Tensor(
-                    shape=(self.num_points, 3), dtype=tf.float32)
+            'positions':
+                tfds.features.Tensor(shape=(self.num_points, 3),
+                                     dtype=tf.float32),
+            'normals':
+                tfds.features.Tensor(shape=(self.num_points, 3),
+                                     dtype=tf.float32)
         }
 
     def load_example(self, path):
@@ -183,21 +189,21 @@ class CloudNormalConfig(ModelnetConfig):
             positions, face_indices = trimesh.sample.sample_surface(
                 mesh, self.num_points)
             normals = mesh.face_normals[face_indices]
-        return dict(
-            positions=positions.astype(np.float32),
-            normals=normals.astype(np.float32))
+        return dict(positions=positions.astype(np.float32),
+                    normals=normals.astype(np.float32))
 
 
 class UniformDensityCloudNormalConfig(CloudNormalConfig):
     """Positions and normals of points with roughly uniform point density."""
+
     def __init__(self, num_points, k=20, r0=0.1, name=None, **kwargs):
         if name is None:
-            name = 'uniform_density_cloud_normals-%d-%d-%d' % (
-                k, 100*r0, num_points)
+            name = 'uniform_density_cloud_normals-%d-%d-%d' % (k, 100 * r0,
+                                                               num_points)
         self._k = k
         self._r0 = r0
-        super(UniformDensityCloudNormalConfig, self).__init__(
-            name=name, num_points=num_points, **kwargs)
+        super(UniformDensityCloudNormalConfig,
+              self).__init__(name=name, num_points=num_points, **kwargs)
 
     @property
     def k(self):
@@ -219,6 +225,7 @@ class UniformDensityCloudNormalConfig(CloudNormalConfig):
 
 
 class Modelnet(tfds.core.GeneratorBasedBuilder):
+
     @abc.abstractproperty
     def num_classes(self):
         raise NotImplementedError
@@ -254,10 +261,13 @@ class Modelnet(tfds.core.GeneratorBasedBuilder):
     def _info(self):
         feature_key, feature_value = self.builder_config.feature_item
         features = tfds.core.features.FeaturesDict({
-            'label': tfds.features.ClassLabel(
-                names_file=get_class_names_path(self.num_classes)),
-            'example_index': tfds.features.Tensor(shape=(), dtype=tf.int64),
-            feature_key: feature_value
+            'label':
+                tfds.features.ClassLabel(
+                    names_file=get_class_names_path(self.num_classes)),
+            'example_index':
+                tfds.features.Tensor(shape=(), dtype=tf.int64),
+            feature_key:
+                feature_value
         })
         return tfds.core.DatasetInfo(
             builder=self,
@@ -272,9 +282,9 @@ class Modelnet(tfds.core.GeneratorBasedBuilder):
         gens = []
         for split in ('train', 'test'):
             paths = tuple(self.paths(root_dir, split, suffix='.off'))
-            gen = tfds.core.SplitGenerator(
-                name=split, num_shards=len(paths) // 500 + 1,
-                gen_kwargs=dict(paths=paths))
+            gen = tfds.core.SplitGenerator(name=split,
+                                           num_shards=len(paths) // 500 + 1,
+                                           gen_kwargs=dict(paths=paths))
             gen.split_info.statistics.num_examples = len(paths)
             gens.append(gen)
         return gens
@@ -282,22 +292,23 @@ class Modelnet(tfds.core.GeneratorBasedBuilder):
     def _generate_examples(self, paths):
         config = self.builder_config
         feature_key = config.feature_item[0]
-        assert(self.version.implements(tfds.core.Experiment.S3))
+        assert (self.version.implements(tfds.core.Experiment.S3))
         for path in paths:
             class_name, _, filename = path.split('/')[-3:]
             n = len(class_name)
-            example_index = int(filename[n+1: n+5])
+            example_index = int(filename[n + 1:n + 5])
             feature_values = config.load_example(path)
             key = (class_name, example_index)
             value = {
-               'example_index': example_index,
-               'label': class_name,
-               feature_key: feature_values,
+                'example_index': example_index,
+                'label': class_name,
+                feature_key: feature_values,
             }
             yield key, value
 
 
 class Modelnet10(Modelnet):
+
     @property
     def num_classes(self):
         return 10
@@ -307,6 +318,7 @@ class Modelnet10(Modelnet):
 
 
 class Modelnet40(Modelnet):
+
     @property
     def num_classes(self):
         return 40
@@ -316,6 +328,7 @@ class Modelnet40(Modelnet):
 
 
 class Modelnet40Aligned(Modelnet):
+
     @property
     def num_classes(self):
         return 40
@@ -382,18 +395,15 @@ if __name__ == '__main__':
 
     _dim = {'x': 0, 'y': 1, 'z': 2}
 
-
     def permute_xyz(x, y, z, order='xyz'):
         data = (x, y, z)
         return tuple(data[_dim[k]] for k in order)
-
 
     def vis_point_cloud(points, axis_order='xyz', value=None, **kwargs):
         data = permute_xyz(*points.T, order=axis_order)
         if value is not None:
             data = data + (value,)
         mlab.points3d(*data, **kwargs)
-
 
     def vis_normals(positions, normals, axis_order='xyz', **kwargs):
         x, y, z = permute_xyz(*positions.T, order=axis_order)
