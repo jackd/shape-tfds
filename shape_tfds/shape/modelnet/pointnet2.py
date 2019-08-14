@@ -32,7 +32,13 @@ class Pointnet2Config(base.CloudNormalConfig):
         raise NotImplementedError
 
 
-_BUILDER_CONFIGS = {n: Pointnet2Config(num_classes=n) for n in [10, 40]}
+CONFIG10 = Pointnet2Config(num_classes=10)
+CONFIG40 = Pointnet2Config(num_classes=40)
+
+_BUILDER_CONFIGS = {
+    10: CONFIG10,
+    40: CONFIG40,
+}
 
 
 def get_config(num_classes=40):
@@ -41,7 +47,7 @@ def get_config(num_classes=40):
 
 class Pointnet2(tfds.core.GeneratorBasedBuilder):
     URLS = [base._URL_BASE, "http://stanford.edu/~rqi/pointnet2/"]
-    BUILDER_CONFIGS = [_BUILDER_CONFIGS[n] for n in (10, 40)]
+    BUILDER_CONFIGS = [CONFIG10, CONFIG40]
     _CITATION = """\
 @article{qi2017pointnetplusplus,
     title={PointNet++: Deep Hierarchical Feature Learning on Point Sets in a Metric Space},
@@ -104,14 +110,20 @@ class Pointnet2(tfds.core.GeneratorBasedBuilder):
         return out
 
     def _generate_examples(self, example_ids, data_dir):
+        import psutil
         for example_id in example_ids:
+            files = psutil.Process().open_files()
+            if len(files) > 100:
+                print('Open files:')
+                print('\n'.join(f[0] for f in files))
+                raise Exception('{} open files'.format(len(files)))
             split_id = example_id.split("_")
             label = "_".join(split_id[:-1])
             example_index = int(split_id[-1]) - 1
-            path = os.path.join(data_dir, label, "%s.txt" % example_id)
+            path = os.path.join(data_dir, label, "{}.txt".format(example_id))
             with tf.io.gfile.GFile(path, "rb") as fp:
                 data = np.loadtxt(fp, delimiter=",", dtype=np.float32)
             positions, normals = np.split(data, 2, axis=1)  # pylint: disable=unbalanced-tuple-unpacking
             cloud = dict(positions=positions, normals=normals)
-            yield ((label, example_index),
+            yield ('{}-{}'.format(label, example_index),
                    dict(cloud=cloud, label=label, example_index=example_index))
