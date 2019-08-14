@@ -9,14 +9,14 @@ import tensorflow_datasets as tfds
 from shape_tfds.shape.modelnet import base
 
 
-class ModelnetSampledConfig(base.CloudNormalConfig):
+class Pointnet2Config(base.CloudNormalConfig):
 
     def __init__(self, num_classes):
         """num_classes must be 10 or 40."""
         assert (num_classes in (10, 40))
         num_points = 10000
         self._num_classes = num_classes
-        super(ModelnetSampledConfig, self).__init__(
+        super(Pointnet2Config, self).__init__(
             name="presampled%d-%d" % (num_classes, num_points),
             num_points=num_points,
             description=(
@@ -32,14 +32,14 @@ class ModelnetSampledConfig(base.CloudNormalConfig):
         raise NotImplementedError
 
 
-_BUILDER_CONFIGS = {n: ModelnetSampledConfig(num_classes=n) for n in [10, 40]}
+_BUILDER_CONFIGS = {n: Pointnet2Config(num_classes=n) for n in [10, 40]}
 
 
 def get_config(num_classes=40):
     return _BUILDER_CONFIGS[num_classes]
 
 
-class ModelnetSampled(tfds.core.GeneratorBasedBuilder):
+class Pointnet2(tfds.core.GeneratorBasedBuilder):
     URLS = [base._URL_BASE, "http://stanford.edu/~rqi/pointnet2/"]
     BUILDER_CONFIGS = [_BUILDER_CONFIGS[n] for n in (10, 40)]
     _CITATION = """\
@@ -50,6 +50,10 @@ class ModelnetSampled(tfds.core.GeneratorBasedBuilder):
     year={2017}
 }
 """
+
+    @property
+    def up_dim(self):
+        return 1
 
     @property
     def num_classes(self):

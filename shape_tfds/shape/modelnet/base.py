@@ -126,11 +126,21 @@ class ModelnetConfig(tfds.core.BuilderConfig):
 
 class CloudConfig(ModelnetConfig):
 
-    def __init__(self, num_points, name=None, version="0.0.1", **kwargs):
+    def __init__(self,
+                 num_points,
+                 name=None,
+                 version="0.0.1",
+                 up_dim=2,
+                 **kwargs):
         self._num_points = num_points
         if name is None:
             name = 'cloud-%d' % num_points
         super(CloudConfig, self).__init__(name=name, version=version, **kwargs)
+        self._up_dim = up_dim
+
+    @property
+    def up_dim(self):
+        return self._up_dim
 
     @property
     def num_points(self):
@@ -225,6 +235,10 @@ class UniformDensityCloudNormalConfig(CloudNormalConfig):
 
 
 class Modelnet(tfds.core.GeneratorBasedBuilder):
+
+    @property
+    def up_dim(self):
+        return self.builder_config.up_dim
 
     @abc.abstractproperty
     def num_classes(self):

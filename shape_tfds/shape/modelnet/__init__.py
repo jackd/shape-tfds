@@ -5,3 +5,7 @@ from shape_tfds.shape.modelnet.base import ModelnetConfig
 from shape_tfds.shape.modelnet.base import CloudConfig
 from shape_tfds.shape.modelnet.base import CloudNormalConfig
 from shape_tfds.shape.modelnet.base import UniformDensityCloudNormalConfig
+from shape_tfds.shape.modelnet.pointnet import Pointnet
+from shape_tfds.shape.modelnet.pointnet2 import Pointnet2
+from shape_tfds.shape.modelnet.pointnet2 import Pointnet2Config
+from shape_tfds.shape.modelnet.pointnet2 import get_config as get_pointnet2_config
