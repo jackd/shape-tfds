@@ -36,6 +36,59 @@ LABEL_SPLITS = (
     50,
 )
 
+POINT_CLASS_FREQ = (
+    2275419,
+    1664032,
+    642156,
+    460568,
+    9715,
+    138138,
+    75487,
+    26726,
+    97844,
+    131510,
+    288766,
+    1302657,
+    2430900,
+    2989559,
+    1510814,
+    260298,
+    74972,
+    31482,
+    15683,
+    109676,
+    246091,
+    942116,
+    298731,
+    289889,
+    357113,
+    1535899,
+    30956,
+    506672,
+    479080,
+    415252,
+    15960,
+    13613,
+    80202,
+    5217,
+    2217,
+    223851,
+    22325,
+    343634,
+    359971,
+    164593,
+    30528,
+    76608,
+    19519,
+    12561,
+    29492,
+    218704,
+    18829,
+    7729973,
+    2395978,
+    317260,
+)
+
 
 def part_class_indices(object_class_index):
     return range(
@@ -198,7 +251,8 @@ class ShapenetPart2017(tfds.core.GeneratorBasedBuilder):
             with tf.io.gfile.GFile(path, "rb") as fp:
                 data = np.loadtxt(fp, dtype=np.float32)
             positions, normals, labels = np.split(data, (3, 6), axis=1)  # pylint: disable=unbalanced-tuple-unpacking
-            yield example_id, dict(
+            labels = np.squeeze(labels, axis=-1)
+            yield '/'.join((synset_id, example_id)), dict(
                 cloud=self.builder_config.map_cloud(
                     dict(
                         positions=positions,

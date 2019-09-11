@@ -96,10 +96,26 @@ def get_class_names_path(num_classes):
                         'class_names%d.txt' % num_classes)
 
 
+def load_class_freq(num_classes=40):
+    """Class frequency in train split."""
+    path = os.path.join(os.path.dirname(__file__), 'class_freq.txt')
+    freqs = np.loadtxt(path, dtype=np.int64)
+    if num_classes == 40:
+        return freqs
+    elif num_classes == 10:
+        n10, n40 = (load_class_names(n) for n in (10, 40))
+        indices40 = {k: i for i, k in enumerate(n40)}
+        return freqs[[indices40[k] for k in n10]]
+    else:
+        raise ValueError(
+            'num_classes must be 10 or 40, got {}'.format(num_classes))
+
+
 def load_class_names(num_classes):
     path = get_class_names_path(num_classes)
     with tf.io.gfile.GFile(path, 'rb') as fp:
-        return fp.read().decode('utf-8').split('/')[:-1]
+        data = fp.read().decode('utf-8')
+        return data.split('\n')[:-1]
 
 
 def _load_split_paths(root_dir):
@@ -126,21 +142,15 @@ class ModelnetConfig(tfds.core.BuilderConfig):
 
 class CloudConfig(ModelnetConfig):
 
-    def __init__(self,
-                 num_points,
-                 name=None,
-                 version="0.0.1",
-                 up_dim=2,
-                 **kwargs):
+    def __init__(self, num_points, name=None, version="0.0.1", **kwargs):
         self._num_points = num_points
         if name is None:
             name = 'cloud-%d' % num_points
         super(CloudConfig, self).__init__(name=name, version=version, **kwargs)
-        self._up_dim = up_dim
 
     @property
     def up_dim(self):
-        return self._up_dim
+        return 2
 
     @property
     def num_points(self):

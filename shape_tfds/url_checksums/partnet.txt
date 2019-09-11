@@ -1,0 +1,1 @@
+http://download.cs.stanford.edu/orion/partnet_dataset/sem_seg_h5.zip 8569950662 27dda846d9c1cf24827252fe0edf78a83f3a48c870e2c0d4222780e06cdeadb8
