@@ -110,6 +110,10 @@ class Partnet(tfds.core.GeneratorBasedBuilder):
 
     BUILDER_CONFIGS = [PartnetConfig(c) for c in OBJECT_CATEGORIES]
 
+    @property
+    def up_dim(self):
+        return 1
+
     @core_utils.memoized_property
     def class_names(self):
         return {
