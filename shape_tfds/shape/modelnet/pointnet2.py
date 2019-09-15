@@ -22,8 +22,7 @@ class Pointnet2Config(base.CloudNormalConfig):
             description=(
                 "%d-class sampled 10000-point cloud used by PointNet++" %
                 num_classes),
-            version=tfds.core.utils.Version(
-                "0.0.1", experiments={tfds.core.utils.Experiment.S3: False}))
+            version=tfds.core.utils.Version("0.0.1"))
 
     @property
     def num_classes(self):
@@ -111,13 +110,7 @@ class Pointnet2(tfds.core.GeneratorBasedBuilder):
         return out
 
     def _generate_examples(self, example_ids, data_dir):
-        # import psutil
         for example_id in example_ids:
-            # files = psutil.Process().open_files()
-            # if len(files) > 100:
-            #     print('Open files:')
-            #     print('\n'.join(f[0] for f in files))
-            #     raise Exception('{} open files'.format(len(files)))
             split_id = example_id.split("_")
             label = "_".join(split_id[:-1])
             example_index = int(split_id[-1]) - 1
@@ -126,9 +119,5 @@ class Pointnet2(tfds.core.GeneratorBasedBuilder):
                 data = np.loadtxt(fp, delimiter=",", dtype=np.float32)
             positions, normals = np.split(data, 2, axis=1)  # pylint: disable=unbalanced-tuple-unpacking
             cloud = dict(positions=positions, normals=normals)
-            example = dict(cloud=cloud,
-                           label=label,
-                           example_index=example_index)
-            yield example
-            # yield ('{}-{}'.format(label, example_index),
-            #        dict(cloud=cloud, label=label, example_index=example_index))
+            yield ('{}-{}'.format(label, example_index),
+                   dict(cloud=cloud, label=label, example_index=example_index))
