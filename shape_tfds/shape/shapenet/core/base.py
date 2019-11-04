@@ -2,21 +2,12 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import abc
-from absl import logging
 import numpy as np
 import tensorflow as tf
 import tensorflow_datasets.public_api as tfds
-import tqdm
 import os
 import json
 import zipfile
-from shape_tfds.core import util
-import six
-import collections
-import itertools
-import contextlib
-import functools
 
 from collection_utils.mapping import Mapping
 from collection_utils.iterable import single
@@ -308,3 +299,67 @@ class ShapenetCore(shape_mapping.MappingBuilder):
     @property
     def urls(self):
         return [SHAPENET_URL]
+
+
+
+def sample_triangle(v, n=None):
+    if hasattr(n, 'dtype'):
+        n = np.asscalar(n)
+    if n is None:
+        size = v.shape[:-2] + (2,)
+    elif isinstance(n, int):
+        size = (n, 2)
+    elif isinstance(n, tuple):
+        size = n + (2,)
+    elif isinstance(n, list):
+        size = tuple(n) + (2,)
+    else:
+        raise TypeError('n must be int, tuple or list, got %s' % str(n))
+    assert(v.shape[-2] == 2)
+    a = np.random.uniform(size=size)
+    mask = np.sum(a, axis=-1) > 1
+    a[mask] *= -1
+    a[mask] += 1
+    a = np.expand_dims(a, axis=-1)
+    return np.sum(a*v, axis=-2)
+
+
+def sample_faces(vertices, faces, n_total):
+    if len(faces) == 0:
+        raise ValueError('Cannot sample points from zero faces.')
+    tris = vertices[faces]
+    n_faces = len(faces)
+    d0 = tris[..., 0:1, :]
+    ds = tris[..., 1:, :] - d0
+    assert(ds.shape[1:] == (2, 3))
+    areas = 0.5 * np.sqrt(np.sum(np.cross(ds[:, 0], ds[:, 1])**2, axis=-1))
+    cum_area = np.cumsum(areas)
+    cum_area *= (n_total / cum_area[-1])
+    cum_area = np.round(cum_area).astype(np.int32)
+
+    positions = []
+    last = 0
+    for i in range(n_faces):
+        n = cum_area[i] - last
+        last = cum_area[i]
+        if n > 0:
+            positions.append(d0[i] + sample_triangle(ds[i], n))
+    return np.concatenate(positions, axis=0)
+
+
+def cloud_loader_context(synset_id, num_points, dl_manager=None):
+    import trimesh
+
+    def map_fn(key, value):
+        if not isinstance(value, trimesh.Trimesh):
+            meshes = [
+                trimesh.Trimesh(vertices=m.vertices, faces=m.faces)
+                for m in value.geometry.values()]
+            value = trimesh.util.concatenate(meshes)
+
+        # trimesh sample seems to have issues?
+        # return sample_surface(value, num_points)[0].astype(np.float32)
+        return sample_faces(
+            value.vertices, value.faces, num_points).astype(np.float32)
+
+    return zipped_mesh_loader_context(synset_id, dl_manager, map_fn)

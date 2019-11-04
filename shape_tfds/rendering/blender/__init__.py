@@ -1,4 +1,4 @@
-from shape_tfds.rendering.blender.render import render
+from shape_tfds.rendering.blender.renderer import render
 
 __all__ = [
     'render',

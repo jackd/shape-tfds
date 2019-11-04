@@ -72,7 +72,7 @@ class Renderer(object):
         ry, rx = self.resolution
         return '%s-render%dx%d' % (self._base_name, ry, rx)
 
-    def base_mapping(self, synset_id, dl_manager=None):
+    def base_mapping(self, synset_id, dl_manager=None) -> mapping.Mapping:
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -127,7 +127,7 @@ class BlenderRenderer(Renderer):
 
     def render(self, base_value, camera_positions):
         import tempfile
-        from shape_tfds.rendering.blender import render
+        from shape_tfds.rendering.blender.renderer import render
         with tempfile.TemporaryDirectory() as temp_dir:
             tmp_path = render(obj_path=base_value,
                               output_directory=temp_dir,

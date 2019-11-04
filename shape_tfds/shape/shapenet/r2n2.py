@@ -12,13 +12,12 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from absl import logging
 import os
-import collections
 import six
 import contextlib
 import numpy as np
 import tensorflow as tf
-import itertools
 
 import tensorflow_datasets.public_api as tfds
 from tensorflow_datasets.core import lazy_imports
@@ -158,6 +157,33 @@ class ShapenetR2n2Config(tfds.core.BuilderConfig):
                 (self.synset_name, self.synset_id)))
 
 
+def load_meta(renderings_dir, model_id):
+    meta_path = os.path.join(renderings_dir, model_id, "rendering",
+                             "rendering_metadata.txt")
+    with tf.io.gfile.GFile(meta_path, "rb") as fp:
+        meta = np.loadtxt(fp)
+    return meta.astype(np.float32)
+
+
+def load_voxels(voxels_dir, model_id):
+    binvox_path = os.path.join(voxels_dir, model_id, "model.binvox")
+    with tf.io.gfile.GFile(binvox_path, mode="rb") as fp:
+        voxel = trimesh.load(fp, file_type='binvox')
+    return voxel.encoding.dense
+
+
+def load_image(renderings_dir, model_id, image_index):
+    image_path = os.path.join(renderings_dir, model_id, "rendering",
+                              "%02d.png" % image_index)
+    with tf.io.gfile.GFile(image_path, "rb") as fp:
+        image = np.array(lazy_imports.PIL_Image.open(fp))  # pylint: disable=no-member
+    # tfds image features can't have 4 channels.
+    background = (image[..., -1] == 0)
+    image = image[..., :3]
+    image[background] = BACKGROUND_COLOR
+    return image
+
+
 class ShapenetR2n2(tfds.core.GeneratorBasedBuilder):
     """Builder for rendered/voxelized subset of Shapenet 3D dataset."""
 
@@ -189,7 +215,6 @@ class ShapenetR2n2(tfds.core.GeneratorBasedBuilder):
             citation=_CITATION)
 
     def _split_generators(self, dl_manager):
-        from tensorflow_datasets.core.download import resource
         # Unfortunately the files at these urls are twice the size they need to be
         # since the archives contain an inner archive containing almost
         # everything in the rest of the outer archive.
@@ -223,11 +248,9 @@ class ShapenetR2n2(tfds.core.GeneratorBasedBuilder):
 
         return [
             tfds.core.SplitGenerator(name=tfds.Split.TRAIN,
-                                     num_shards=len(train_ids) // 1000 + 1,
                                      gen_kwargs=dict(model_ids=train_ids,
                                                      **kwargs)),
             tfds.core.SplitGenerator(name=tfds.Split.TEST,
-                                     num_shards=len(test_ids) // 1000 + 2,
                                      gen_kwargs=dict(model_ids=test_ids,
                                                      **kwargs))
         ]
@@ -240,37 +263,147 @@ class ShapenetR2n2(tfds.core.GeneratorBasedBuilder):
     def _generate_example_data(self, synset_id, model_ids, voxels_dir,
                                renderings_dir):
 
-        def load_image(model_id, image_index):
-            image_path = os.path.join(renderings_dir, model_id, "rendering",
-                                      "%02d.png" % image_index)
-            with tf.io.gfile.GFile(image_path, "rb") as fp:
-                image = np.array(lazy_imports.PIL_Image.open(fp))  # pylint: disable=no-member
-            # tfds image features can't have 4 channels.
-            background = (image[..., -1] == 0)
-            image = image[..., :3]
-            image[background] = BACKGROUND_COLOR
-            return image
-
-        def load_meta(model_id):
-            meta_path = os.path.join(renderings_dir, model_id, "rendering",
-                                     "rendering_metadata.txt")
-            with tf.io.gfile.GFile(meta_path, "rb") as fp:
-                meta = np.loadtxt(fp)
-            return meta.astype(np.float32)
-
-        def load_voxels(model_id):
-            binvox_path = os.path.join(voxels_dir, model_id, "model.binvox")
-            with tf.io.gfile.GFile(binvox_path, mode="rb") as fp:
-                voxel = trimesh.load(fp, file_type='binvox')
-            return voxel.encoding.dense
-
         for model_id in model_ids:
             images = [
-                load_image(model_id, i) for i in range(RENDERINGS_PER_EXAMPLE)
+                load_image(renderings_dir, model_id, i)
+                for i in range(RENDERINGS_PER_EXAMPLE)
             ]
-            voxels = load_voxels(model_id)
-            meta = load_meta(model_id)
+            voxels = load_voxels(voxels_dir, model_id)
+            meta = load_meta(renderings_dir, model_id)
             yield dict(voxels=voxels,
                        renderings=dict(image=images, meta=meta),
                        model_id=model_id,
                        synset_id=synset_id)
+
+
+@contextlib.contextmanager
+def temp_random_state(seed=123):
+    orig_state = np.random.get_state()
+    np.random.seed(seed)
+    yield
+    np.random.set_state(orig_state)
+
+
+class ShapenetR2n2CloudConfig(tfds.core.BuilderConfig):
+
+    def __init__(self, synset, num_points):
+        """Create the config object for `ShapenetR2n2Cloud` `DatasetBuilder`.
+
+        Args:
+        synset: str, synset name or id
+        """
+        assert (isinstance(synset, six.string_types))
+        assert (isinstance(num_points, int) and num_points > 0)
+        self.synset_id = synset_id(synset)
+        self.synset_name = synset_name(synset)
+        self.num_points = num_points
+        super(ShapenetR2n2CloudConfig, self).__init__(
+            name='{}-c{}'.format(self.synset_id, num_points),
+            version=tfds.core.Version("0.0.1"),
+            description=("Multi-view renderings/cloud for ShapeNet synset "
+                         "{} ({}), {} points".format(self.synset_name,
+                                                     self.synset_id,
+                                                     self.num_points)))
+
+
+class ShapenetR2n2Cloud(ShapenetR2n2):
+
+    def _info(self):
+        features = tfds.features.FeaturesDict(
+            dict(synset_id=tfds.features.ClassLabel(names=synset_ids()),
+                 model_id=tfds.features.Text(),
+                 points=tfds.features.Tensor(
+                     shape=(self.builder_config.num_points, 3),
+                     dtype=tf.float32),
+                 renderings=tfds.features.Sequence(
+                     dict(image=tfds.features.Image(shape=IMAGE_SHAPE),
+                          meta=tfds.features.Tensor(shape=(5,),
+                                                    dtype=tf.float32)),
+                     length=RENDERINGS_PER_EXAMPLE)))
+
+        return tfds.core.DatasetInfo(
+            builder=self,
+            description=("Shapenet is a large collection of 3D CAD models. "
+                         "This dataset provides renderings and sampled point "
+                         "clouds of a subset of 13 categories as used by "
+                         "Choy et al."),
+            features=features,
+            supervised_keys=("renderings", "points"),
+            urls=[
+                "http://cvgl.stanford.edu/3d-r2n2/", "https://www.shapenet.org/"
+            ],
+            citation=_CITATION)
+
+    def _split_generators(self, dl_manager):
+        from shape_tfds.shape.shapenet.core.base import cloud_loader_context
+        # Unfortunately the files at these urls are twice the size they need to
+        # be since the archives contain an inner archive containing almost
+        # everything in the rest of the outer archive.
+        resources = dict(
+            voxels="http://cvgl.stanford.edu/data2/ShapeNetVox32.tgz",
+            renderings="http://cvgl.stanford.edu/data2/ShapeNetRendering.tgz")
+
+        data_dirs = dl_manager.download_and_extract(resources)
+        base_renderings_dir = os.path.join(data_dirs["renderings"],
+                                           "ShapeNetRendering")
+        base_voxels_dir = os.path.join(data_dirs["voxels"], "ShapeNetVox32")
+
+        # We manually delete the inner duplicate archive after extraction
+        duplicate_paths = [
+            os.path.join(base_renderings_dir, "rendering_only.tgz"),
+            os.path.join(base_voxels_dir, "binvox.tgz")
+        ]
+        for path in duplicate_paths:
+            if tf.io.gfile.exists(path):
+                tf.io.gfile.remove(path)
+
+        synset_id = self.builder_config.synset_id
+        voxels_dir = os.path.join(base_voxels_dir, synset_id)
+        model_ids = tf.io.gfile.listdir(voxels_dir)
+        train_ids, test_ids = _get_id_split(model_ids)
+
+        num_points = self.builder_config.num_points
+        kwargs = dict(synset_id=synset_id,
+                      renderings_dir=os.path.join(base_renderings_dir,
+                                                  synset_id),
+                      loader_context=cloud_loader_context(
+                          synset_id, num_points, dl_manager))
+
+        return [
+            tfds.core.SplitGenerator(name=tfds.Split.TRAIN,
+                                     gen_kwargs=dict(model_ids=train_ids,
+                                                     **kwargs)),
+            tfds.core.SplitGenerator(name=tfds.Split.TEST,
+                                     gen_kwargs=dict(model_ids=test_ids,
+                                                     **kwargs))
+        ]
+
+    def _generate_example_data(self, synset_id, model_ids, renderings_dir,
+                               loader_context):
+        with loader_context as loader:
+            with temp_random_state():
+
+                for model_id in model_ids:
+                    images = [
+                        load_image(renderings_dir, model_id, i)
+                        for i in range(RENDERINGS_PER_EXAMPLE)
+                    ]
+                    try:
+                        points = loader[model_id]
+                    except:
+                        points = None
+                    if points is None:
+                        logging.warning(
+                            'Failed to load model {}, skipping'.format(
+                                model_id))
+                        continue
+                    if np.any(np.isnan(points)):
+                        logging.warning(
+                            'NaN value detected in model {}, skipping'.format(
+                                model_id))
+                        continue
+                    meta = load_meta(renderings_dir, model_id)
+                    yield dict(points=points,
+                               renderings=dict(image=images, meta=meta),
+                               model_id=model_id,
+                               synset_id=synset_id)

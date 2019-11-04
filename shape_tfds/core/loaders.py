@@ -51,6 +51,6 @@ def load_off(file_obj):
     if face_count != len(faces):
         raise ValueError(
             'Inconsistent number of faces vs header spec, %d vs %d' %
-            (len(faces, face_count)))
+            (len(faces), face_count))
 
     return {'vertices': vertices, 'faces': faces}

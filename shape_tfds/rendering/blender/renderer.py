@@ -61,7 +61,8 @@ def render(obj_path,
     if len(camera_positions.shape) != 2:
         raise ValueError('camera_positions must be 2D')
     with tempfile.TemporaryDirectory() as temp_dir:
-        camera_positions_path = os.path.join(temp_dir, 'camera_positions.npy')
+        camera_positions_path = os.path.join(str(temp_dir),
+                                             'camera_positions.npy')
         np.save(camera_positions_path, camera_positions)
         ry, rx = resolution
         args = [
