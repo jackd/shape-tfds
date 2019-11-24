@@ -1,8 +1,8 @@
-tfds-nightly
+tensorflow-datasets
 trimesh>=3.1.0
 numpy
-git+git://github.com/jackd/collection-utils.git@master
 networkx
 git+git://github.com/mmatl/pyopengl.git
 pyrender
 scipy
+Pillow

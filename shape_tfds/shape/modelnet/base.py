@@ -3,17 +3,13 @@ from __future__ import division
 from __future__ import print_function
 
 import abc
-import collections
-import contextlib
 import os
 import numpy as np
 import tensorflow as tf
 import tensorflow_datasets as tfds
 from tensorflow_datasets.core.download import resource as resource_lib
 
-from shape_tfds.core import mapping as shape_mapping
 from shape_tfds.core.downloads import get_dl_manager
-from collection_utils import mapping
 from shape_tfds.core.random import random_context
 from shape_tfds.core.random import get_random_state
 from shape_tfds.core.loaders import load_off

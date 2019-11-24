@@ -9,13 +9,8 @@ from __future__ import print_function
 
 import abc
 from absl import logging
-import six
 import contextlib
-import collections
-import functools
-import os
 import numpy as np
-import tensorflow as tf
 import tensorflow_datasets as tfds
 import trimesh
 from shape_tfds.shape.shapenet.core import base
@@ -23,7 +18,6 @@ from shape_tfds.shape.shapenet.core import views
 from shape_tfds.core import mapping as shape_mapping
 from tensorflow_datasets.core import features
 import tensorflow_datasets as tfds
-import tempfile
 import tqdm
 from collection_utils import mapping
 from PIL import Image

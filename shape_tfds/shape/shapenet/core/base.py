@@ -2,24 +2,13 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import abc
-from absl import logging
-import numpy as np
 import tensorflow as tf
 import tensorflow_datasets.public_api as tfds
-import tqdm
 import os
 import json
 import zipfile
-from shape_tfds.core import util
-import six
-import collections
-import itertools
-import contextlib
-import functools
 
 from collection_utils.mapping import Mapping
-from collection_utils.iterable import single
 from shape_tfds.core import mapping as shape_mapping
 from shape_tfds.core.downloads import get_dl_manager
 

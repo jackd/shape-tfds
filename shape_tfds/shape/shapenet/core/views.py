@@ -4,9 +4,6 @@ from __future__ import print_function
 
 import numpy as np
 from shape_tfds.shape import transformations
-from collection_utils.mapping import Mapping
-import functools
-import collections
 from shape_tfds.core import random as rand
 
 # default field-of-view in blender
