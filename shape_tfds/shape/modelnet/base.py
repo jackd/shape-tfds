@@ -118,6 +118,8 @@ def _load_split_paths(root_dir):
     out_paths = {'train': [], 'test': []}
     n = len(root_dir) + 1
     for dirname, _, fns in os.walk(root_dir):
+        dirname = str(dirname)
+        fns = tuple(str(fn) for fn in fns)
         paths = tuple(
             os.path.join(dirname[n:], fn) for fn in fns if fn.endswith('.off'))
         if len(paths) > 0:

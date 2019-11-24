@@ -59,7 +59,9 @@ class ShallowDirectoryMapping(collections.Mapping):
     def keys(self):
         n = len(self._root_dir) + 1
         for dirname, _, fns in os.walk(self._root_dir):
+            dirname = str(dirname)
             for fn in fns:
+                fn = str(fn)
                 if fn.endswith('.npy'):
                     path = os.path.join(dirname, fn)
                     if len(path) >= (n + 4):
@@ -103,8 +105,9 @@ class DeepDirectoryMapping(collections.Mapping):
     def keys(self):
         n = len(self._root_dir) + 1
         for dirname, _, fns in os.walk(self._root_dir):
+            dirname = str(dirname)
             for fn in fns:
-                yield os.path.join(dirname[n:], fn)
+                yield os.path.join(dirname[n:], str(fn))
 
 
 def _image_to_string(image, img_format='png'):
