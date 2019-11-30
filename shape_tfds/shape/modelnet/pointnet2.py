@@ -123,7 +123,7 @@ class Pointnet2(tfds.core.GeneratorBasedBuilder):
 
 
 class Pointnet2H5(tfds.core.GeneratorBasedBuilder):
-    """H5 variant - which contains different split apparently..."""
+    """H5 variant - smaller, faster download/processing."""
 
     URLS = [base._URL_BASE, "http://stanford.edu/~rqi/pointnet2/"]
     _CITATION = """\
