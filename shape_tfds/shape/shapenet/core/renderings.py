@@ -19,7 +19,7 @@ from shape_tfds.core import mapping as shape_mapping
 from tensorflow_datasets.core import features
 import tensorflow_datasets as tfds
 import tqdm
-from collection_utils import mapping
+from shape_tfds.core.collection_utils import mapping
 from PIL import Image
 
 

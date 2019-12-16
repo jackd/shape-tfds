@@ -61,7 +61,7 @@ class FrustumVoxelConfig(base.ShapenetCoreConfig):
 
     @contextlib.contextmanager
     def lazy_mapping(self, dl_manager=None):
-        from collection_utils.mapping import ItemMappedMapping
+        from shape_tfds.core.collection_utils.mapping import ItemMappedMapping
         if dl_manager is None:
             dl_manager = sds.core.downloads.get_dl_manager()
         view_fn = views.random_view_fn(seed_offset=self._seed)

@@ -9,7 +9,7 @@ import os
 import json
 import zipfile
 
-from collection_utils.mapping import Mapping
+from shape_tfds.core.collection_utils.mapping import Mapping
 from shape_tfds.core import mapping as shape_mapping
 from shape_tfds.core.downloads import get_dl_manager
 

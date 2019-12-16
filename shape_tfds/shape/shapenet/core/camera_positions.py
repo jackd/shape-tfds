@@ -7,7 +7,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow_datasets.core import features
 
-from collection_utils import mapping
+from shape_tfds.core.collection_utils import mapping
 from shape_tfds.shape.shapenet.core import base
 from shape_tfds.shape.shapenet.core import views
 from shape_tfds.core.mapping import concat_dict_values

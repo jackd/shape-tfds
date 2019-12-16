@@ -37,12 +37,17 @@ def main(_):
     builder.download_and_prepare(download_config=download_config)
 
     if FLAGS.vis:
+        import numpy as np
         try:
             import trimesh
         except ImportError:
             raise ImportError('visualizing requires trimesh')
         for cloud, _ in builder.as_dataset(split='train', as_supervised=True):
-            trimesh.PointCloud(cloud['positions'].numpy()).show()
+            pos = cloud['positions'].numpy()
+            print(np.min(pos, axis=0))
+            print(np.max(pos, axis=0))
+            print(np.max(np.linalg.norm(pos, axis=-1)))
+            trimesh.PointCloud(pos).show()
 
 
 if __name__ == '__main__':
