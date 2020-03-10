@@ -83,8 +83,8 @@ class Pointnet2(tfds.core.GeneratorBasedBuilder):
             features=tfds.core.features.FeaturesDict(features),
             citation=self._CITATION,
             supervised_keys=supervised_keys,
-            urls=self.URLS,
-        )
+            # urls=self.URLS,
+            homepage="http://stanford.edu/~rqi/pointnet2/")
 
     def _split_generators(self, dl_manager):
         res = "https://shapenet.cs.stanford.edu/media/modelnet40_normal_resampled.zip"
@@ -171,7 +171,7 @@ class Pointnet2H5(tfds.core.GeneratorBasedBuilder):
             }),
             citation=self._CITATION,
             supervised_keys=("cloud", "label"),
-            urls=self.URLS,
+            homepage="http://stanford.edu/~rqi/pointnet2/",
         )
 
     def _split_generators(self, dl_manager):

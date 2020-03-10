@@ -105,7 +105,7 @@ _CITATION = """\
     year={2017}
 }"""
 
-_ICCV2017_URL = "https://shapenet.cs.stanford.edu/iccv17/"
+ICCV2017_URL = "https://shapenet.cs.stanford.edu/iccv17/"
 
 PART_SYNSET_IDS = (
     '02691156',
@@ -160,11 +160,11 @@ class ShapenetPart2017Config(tfds.core.BuilderConfig):
                 else:
                     raise ValueError('Unrecognized synset %d' % synset)
 
-            name = '%s-%s' % (name_prefix, synset_id)
+            name = f'{name_prefix}-{synset_id}'
         self.synset = synset
         self.synset_id = synset_id
         self.synset_index = synset_index
-        description = '%s (%s)' % (description, synset)
+        description = f'{description} ({synset})'
         super(ShapenetPart2017Config, self).__init__(name=name,
                                                      version=version,
                                                      description=description)
@@ -174,8 +174,8 @@ class ShapenetPart2017Config(tfds.core.BuilderConfig):
         if self.synset_index is None:
             num_part_classes = NUM_PART_CLASSES
         else:
-            num_part_classes = (LABEL_SPLITS[self.class_index + 1] -
-                                LABEL_SPLITS[self.class_index])
+            num_part_classes = (LABEL_SPLITS[self.synset_index + 1] -
+                                LABEL_SPLITS[self.synset_index])
         return tfds.features.Sequence({
             "labels": tfds.features.ClassLabel(num_classes=num_part_classes),
             "positions": tfds.features.Tensor(shape=(3,), dtype=tf.float32),
@@ -190,7 +190,7 @@ base_config = ShapenetPart2017Config()
 
 
 class ShapenetPart2017(tfds.core.GeneratorBasedBuilder):
-    URLS = [SHAPENET_URL, _ICCV2017_URL]
+    URLS = [SHAPENET_URL, ICCV2017_URL]
     _DL_URL = "https://shapenet.cs.stanford.edu/media/shapenetcore_partanno_segmentation_benchmark_v0_normal.zip"
 
     BUILDER_CONFIGS = [base_config]
@@ -212,7 +212,7 @@ class ShapenetPart2017(tfds.core.GeneratorBasedBuilder):
                                      features=features,
                                      citation=_CITATION,
                                      supervised_keys=("cloud", "label"),
-                                     urls=self.URLS)
+                                     homepage=ICCV2017_URL)
 
     def _split_generators(self, dl_manager):
         data_dir = dl_manager.download_and_extract(self._DL_URL)
@@ -221,16 +221,15 @@ class ShapenetPart2017(tfds.core.GeneratorBasedBuilder):
         split_dir = os.path.join(data_dir, "train_test_split")
 
         out = []
-        for split, key, num_shards in (
-            (tfds.Split.TRAIN, "train", 16),
-            (tfds.Split.VALIDATION, "val", 2),
-            (tfds.Split.TEST, "test", 4),
+        for split, key in (
+            (tfds.Split.TRAIN, "train"),
+            (tfds.Split.VALIDATION, "val"),
+            (tfds.Split.TEST, "test"),
         ):
             split_path = os.path.join(split_dir,
                                       "shuffled_%s_file_list.json" % key)
             out.append(
                 tfds.core.SplitGenerator(name=split,
-                                         num_shards=num_shards,
                                          gen_kwargs=dict(split_path=split_path,
                                                          data_dir=data_dir)))
         return out

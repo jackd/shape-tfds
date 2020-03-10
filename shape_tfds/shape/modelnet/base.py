@@ -295,7 +295,7 @@ class Modelnet(tfds.core.GeneratorBasedBuilder):
             builder=self,
             citation=self.citation,
             supervised_keys=(feature_key, 'label'),
-            urls=self.urls,
+            homepage=self.urls[0],
             features=features,
         )
 
