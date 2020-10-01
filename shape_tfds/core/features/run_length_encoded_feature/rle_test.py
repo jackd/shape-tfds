@@ -1,16 +1,15 @@
-import tensorflow as tf
 import numpy as np
-
+import tensorflow as tf
 from tensorflow_datasets.testing import test_utils
-from tensorflow_datasets.core import tf_compat
-from shape_tfds.core.features.run_length_encoded_feature import rle
 from trimesh.voxel import runlength as np_impl
+
+from shape_tfds.core.features.run_length_encoded_feature import rle
+
 tf.compat.v1.enable_eager_execution()
 
 
 def random_rle_encoding(n=20, max_value=255, dtype=np.uint8):
-    return (np.random.uniform(size=(n,),) * (max_value - 1) + 1).astype(
-        np.uint8)
+    return (np.random.uniform(size=(n,),) * (max_value - 1) + 1).astype(np.uint8)
 
 
 def random_brle_encoding(n=20, max_value=255, dtype=np.uint8):
@@ -18,7 +17,6 @@ def random_brle_encoding(n=20, max_value=255, dtype=np.uint8):
 
 
 class RlreTfTest(tf.test.TestCase):
-
     def assert_array_equal(self, x, y, *args, **kwargs):
         if isinstance(x, tf.Tensor):
             x = self.evaluate(x)
@@ -38,12 +36,16 @@ class RlreTfTest(tf.test.TestCase):
     def test_brle_to_dense(self):
         self.assert_array_equal(
             rle.brle_to_dense(np.array([300, 200, 1000, 0], dtype=np.int64)),
-            [False] * 300 + [True] * 200 + [False] * 1000)
+            [False] * 300 + [True] * 200 + [False] * 1000,
+        )
         self.assert_array_equal(
             rle.brle_to_dense(
-                np.array([255, 0, 45, 200, 255, 0, 255, 0, 255, 0, 235, 0],
-                         dtype=np.int64)),
-            [False] * 300 + [True] * 200 + [False] * 1000)
+                np.array(
+                    [255, 0, 45, 200, 255, 0, 255, 0, 255, 0, 235, 0], dtype=np.int64
+                )
+            ),
+            [False] * 300 + [True] * 200 + [False] * 1000,
+        )
 
     @test_utils.run_in_graph_and_eager_modes()
     def test_brle_length(self):
@@ -53,15 +55,16 @@ class RlreTfTest(tf.test.TestCase):
 
     @test_utils.run_in_graph_and_eager_modes()
     def test_rle_length(self):
-        self.assert_array_equal(rle.rle_length([0, 5, 1, 3, 0, 6]),
-                                rle.brle_length([5, 3, 6, 0]))
+        self.assert_array_equal(
+            rle.rle_length([0, 5, 1, 3, 0, 6]), rle.brle_length([5, 3, 6, 0])
+        )
 
     @test_utils.run_in_graph_and_eager_modes()
     def test_rle_to_dense(self):
-        self.assert_array_equal(rle.rle_to_dense([5, 3, 4, 10]),
-                                [5] * 3 + [4] * 10)
-        self.assert_array_equal(rle.rle_to_dense([5, 300, 4, 100]),
-                                [5] * 300 + [4] * 100)
+        self.assert_array_equal(rle.rle_to_dense([5, 3, 4, 10]), [5] * 3 + [4] * 10)
+        self.assert_array_equal(
+            rle.rle_to_dense([5, 300, 4, 100]), [5] * 300 + [4] * 100
+        )
 
     @test_utils.run_in_graph_and_eager_modes()
     def test_brle_encode_decode(self):
@@ -111,5 +114,5 @@ class RlreTfTest(tf.test.TestCase):
         self.assert_array_equal(rle.tf_repeat(values, repeats), expected)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     tf.test.main()

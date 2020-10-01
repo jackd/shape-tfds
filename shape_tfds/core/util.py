@@ -4,7 +4,7 @@ def flatten_dicts(input_dict):
         if isinstance(v, dict):
             v = flatten_dicts(v)
             for k2, v2 in v.items():
-                out['%s/%s' % (k, k2)] = v2
+                out["%s/%s" % (k, k2)] = v2
         else:
             out[k] = v
     return out
@@ -13,7 +13,7 @@ def flatten_dicts(input_dict):
 def nest_dicts(input_dict):
     out = {}
     for k, v in input_dict.items():
-        keys = k.split('/')
+        keys = k.split("/")
         inner = out
         for k2 in keys[:-1]:
             inner = inner.setdefault(k2, {})

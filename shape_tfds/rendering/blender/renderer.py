@@ -1,28 +1,31 @@
-from absl import logging
 import os
-import json
-import numpy as np
 import subprocess
 import tempfile
 from distutils.spawn import find_executable
 
+import numpy as np
+from absl import logging
+
 BLENDER_RENDER_SCRIPT = os.path.join(
-    os.path.realpath(os.path.dirname(__file__)), '_blender_render.py')
-BLENDER_PATH = find_executable('blender')
+    os.path.realpath(os.path.dirname(__file__)), "_blender_render.py"
+)
+BLENDER_PATH = find_executable("blender")
 
 
-def render(obj_path,
-           output_directory,
-           camera_positions,
-           fov,
-           resolution=(128, 128),
-           filename_format='{output:s}-{index:03d}.png',
-           script_path=BLENDER_RENDER_SCRIPT,
-           blender_path=BLENDER_PATH,
-           include_depth=True,
-           include_normals=True,
-           include_albedo=True,
-           verbose=False):
+def render(
+    obj_path,
+    output_directory,
+    camera_positions,
+    fov,
+    resolution=(128, 128),
+    filename_format="{output:s}-{index:03d}.png",
+    script_path=BLENDER_RENDER_SCRIPT,
+    blender_path=BLENDER_PATH,
+    include_depth=True,
+    include_normals=True,
+    include_albedo=True,
+    verbose=False,
+):
     """
     Render the given obj file with blender.
 
@@ -48,56 +51,57 @@ def render(obj_path,
     if blender_path is None:
         if BLENDER_PATH is None:
             raise RuntimeError(
-                '`blender_path` must be provided if `blender` executable not '
-                'found on path')
+                "`blender_path` must be provided if `blender` executable not "
+                "found on path"
+            )
         else:
-            raise ValueError('`blender_path` cannot be `None`')
+            raise ValueError("`blender_path` cannot be `None`")
     if not os.path.isfile(blender_path):
-        raise ValueError('No file at `blender_path` %s' % blender_path)
+        raise ValueError("No file at `blender_path` %s" % blender_path)
     if len(camera_positions.shape) != 2:
-        raise ValueError('camera_positions must be 2D')
+        raise ValueError("camera_positions must be 2D")
     with tempfile.TemporaryDirectory() as temp_dir:
-        camera_positions_path = os.path.join(str(temp_dir),
-                                             'camera_positions.npy')
+        camera_positions_path = os.path.join(str(temp_dir), "camera_positions.npy")
         np.save(camera_positions_path, camera_positions)
         ry, rx = resolution
         args = [
             blender_path,
-            '--background',
-            '--python',
+            "--background",
+            "--python",
             script_path,
-            '--',
-            '--obj',
+            "--",
+            "--obj",
             obj_path,
-            '--out_dir',
+            "--out_dir",
             output_directory,
             # '--filename_format', filename_format,
-            '--camera_positions',
+            "--camera_positions",
             camera_positions_path,
-            '--fov',
+            "--fov",
             str(fov),
-            '--resolution',
+            "--resolution",
             str(ry),
             str(rx),
         ]
         if include_depth:
-            args.append('-d')
+            args.append("-d")
         if include_normals:
-            args.append('-n')
+            args.append("-n")
         if include_albedo:
-            args.append('-a')
+            args.append("-a")
         output = subprocess.check_output(args)
         if verbose:
             logging.info(output)
-    return os.path.join(output_directory, '{output}-{index:03d}.png')
+    return os.path.join(output_directory, "{output}-{index:03d}.png")
 
 
-if __name__ == '__main__':
-    from shape_tfds.shape.shapenet.core import base
-    from shape_tfds.shape.shapenet.core import views
+if __name__ == "__main__":
     import shutil
-    synset = 'airplane'
-    split = 'train'
+
+    from shape_tfds.shape.shapenet.core import base, views
+
+    synset = "airplane"
+    split = "train"
     index = 0
     num_views = 5
     include_normals = False
@@ -114,14 +118,16 @@ if __name__ == '__main__':
 
     view_fn = views.random_view_fn()
     positions = view_fn(model_id, num_views=num_views)
-    output_directory = os.path.join('/tmp/shapenet_renderings/%s' % model_id)
+    output_directory = os.path.join("/tmp/shapenet_renderings/%s" % model_id)
     if os.path.isdir(output_directory):
         shutil.rmtree(output_directory)
     os.makedirs(output_directory)
-    rendered_path = render(obj_path,
-                           output_directory,
-                           positions,
-                           fov=views.DEFAULT_FOV,
-                           include_normals=include_normals,
-                           include_depth=include_depth,
-                           include_albedo=include_albedo)
+    rendered_path = render(
+        obj_path,
+        output_directory,
+        positions,
+        fov=views.DEFAULT_FOV,
+        include_normals=include_normals,
+        include_depth=include_depth,
+        include_albedo=include_albedo,
+    )

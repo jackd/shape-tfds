@@ -1,4 +1,3 @@
-import tensorflow_datasets as tfds
 from shape_tfds.shape.shapenet.partnet import Partnet
 
 for config in Partnet.BUILDER_CONFIGS:

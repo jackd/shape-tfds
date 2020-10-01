@@ -6,7 +6,6 @@ def _is_base_sequence(value):
 
 
 class Sequence(collections.Sequence):
-
     def map(self, map_fn):
         return MappedSequence(self, map_fn)
 
@@ -17,7 +16,7 @@ class Sequence(collections.Sequence):
         elif len(kwargs) == 0:
             return ZippedSequence(*args)
         else:
-            raise ValueError('Either args or kwargs must be empty')
+            raise ValueError("Either args or kwargs must be empty")
 
     @staticmethod
     def wrapped(sequence):
@@ -29,19 +28,20 @@ class Sequence(collections.Sequence):
 
 
 class CompoundSequence(Sequence):
-
     def __init__(self, items):
         for item in items:
             if not _is_base_sequence(item[1]):
                 raise TypeError(
-                    'all item values must be sequences, but item %s is not' %
-                    str(item))
+                    "all item values must be sequences, but item %s is not" % str(item)
+                )
         first, *rest = items
         nf = len(first[1])
         for k, v in rest:
             if len(v) != nf:
-                raise ValueError('Inconsistent lengths %s and %s: %d vs %s' %
-                                 (first[0], k, nf, len(v)))
+                raise ValueError(
+                    "Inconsistent lengths %s and %s: %d vs %s"
+                    % (first[0], k, nf, len(v))
+                )
         self._len = nf
 
     def __len__(self):
@@ -93,10 +93,9 @@ class ZippedSequence(CompoundSequence):
 
 
 class DelegatingSequence(Sequence):
-
     def __init__(self, base):
         if not _is_base_sequence(base):
-            raise TypeError('base must be a sequence, got %s' % base)
+            raise TypeError("base must be a sequence, got %s" % base)
         self._base = base
 
     def __len__(self):

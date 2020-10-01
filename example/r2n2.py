@@ -1,22 +1,24 @@
-from absl import app, flags
 import tensorflow as tf
 import tensorflow_datasets as tfds
+from absl import app, flags
+
 from shape_tfds.shape.shapenet.r2n2 import synset_id
 
 tf.compat.v1.enable_eager_execution()
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string("synset", "telephone", "category name or id")
-flags.DEFINE_bool("download", True,
-                  "setting to false after initial run makes things faster")
+flags.DEFINE_bool(
+    "download", True, "setting to false after initial run makes things faster"
+)
 flags.DEFINE_integer("image_index", 0, "image index to use")
 
 
 def vis(image, voxels):
     """visualize a single image/voxel pair."""
     import matplotlib.pyplot as plt
-    # This import registers the 3D projection, but is otherwise unused.
-    from mpl_toolkits.mplot3d import Axes3D
+    from mpl_toolkits.mplot3d import Axes3D  # pylint: disable=unused-import
+
     fig = plt.figure()
     ax = fig.gca()
     ax.imshow(image)
@@ -28,10 +30,10 @@ def vis(image, voxels):
 
 
 def main(argv):
-    builder = tfds.builder('shapenet_r2n2/%s' % synset_id(FLAGS.synset))
+    builder = tfds.builder("shapenet_r2n2/%s" % synset_id(FLAGS.synset))
     download_config = tfds.download.DownloadConfig(register_checksums=True)
     builder.download_and_prepare(download_config=download_config)
-    dataset = builder.as_dataset(split='train')
+    dataset = builder.as_dataset(split="train")
 
     for example in dataset:
         voxels = example["voxels"]

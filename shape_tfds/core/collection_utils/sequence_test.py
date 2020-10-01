@@ -1,9 +1,9 @@
 import unittest
+
 from shape_tfds.core.collection_utils import sequence
 
 
 class SequenceTest(unittest.TestCase):
-
     def test_dict_sequence(self):
         x = [0, 1, 2, 3]
         y = [10, 11, 12, 13]
@@ -20,17 +20,18 @@ class SequenceTest(unittest.TestCase):
 
     def test_mapped_sequence(self):
         base = range(5)
-        mapped = sequence.MappedSequence(base, lambda x: x**2)
-        self.assertEqual(list(mapped), [x**2 for x in base])
+        mapped = sequence.MappedSequence(base, lambda x: x ** 2)
+        self.assertEqual(list(mapped), [x ** 2 for x in base])
         self.assertEqual(mapped[3], 9)
 
     def test_map(self):
         self.assertEqual(
             list(sequence.Sequence.wrapped(range(5)).map(lambda x: x + 1)),
-            list(range(1, 6)))
+            list(range(1, 6)),
+        )
         self.assertEqual(
-            list(sequence.Sequence.mapped(range(5), lambda x: x + 1)),
-            list(range(1, 6)))
+            list(sequence.Sequence.mapped(range(5), lambda x: x + 1)), list(range(1, 6))
+        )
 
     def test_zipped(self):
         zipped = sequence.Sequence.zipped(x=[], y=[])
@@ -39,5 +40,5 @@ class SequenceTest(unittest.TestCase):
         self.assertIsInstance(zipped, sequence.ZippedSequence)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

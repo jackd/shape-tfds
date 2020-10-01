@@ -1,17 +1,14 @@
-from absl import app, flags
+import numpy as np
 import tensorflow as tf
-import tensorflow_datasets as tfds
+from absl import app, flags
+
 from shape_tfds.shape.shapenet import core
 
-import tensorflow as tf
-import matplotlib.pyplot as plt
-import numpy as np
-
-flags.DEFINE_string('synset', default='suitcase', help='synset name')
-flags.DEFINE_integer('vox_res', default=32, help='voxel resolution')
-flags.DEFINE_integer('image_res', default=128, help='voxel resolution')
-flags.DEFINE_integer('seed', default=0, help='seed to use for random_view_fn')
-flags.DEFINE_boolean('vis', default=False, help='visualize on finish')
+flags.DEFINE_string("synset", default="suitcase", help="synset name")
+flags.DEFINE_integer("vox_res", default=32, help="voxel resolution")
+flags.DEFINE_integer("image_res", default=128, help="voxel resolution")
+flags.DEFINE_integer("seed", default=0, help="seed to use for random_view_fn")
+flags.DEFINE_boolean("vis", default=False, help="visualize on finish")
 
 
 def main(_):
@@ -23,16 +20,17 @@ def main(_):
 
     synset_id = name if name in names else ids[name]
     if synset_id not in names:
-        raise ValueError('Invalid synset_id %s' % synset_id)
+        raise ValueError("Invalid synset_id %s" % synset_id)
 
-    configs = dict(image=core.TrimeshRenderingConfig(
-        synset_id=synset_id, resolution=(FLAGS.image_res,) * 2, seed=seed),
-                   voxels=core.FrustumVoxelConfig(synset_id=synset_id,
-                                                  resolution=FLAGS.vox_res,
-                                                  seed=seed))
-    builders = {
-        k: core.ShapenetCore(config=config) for k, config in configs.items()
-    }
+    configs = dict(
+        image=core.TrimeshRenderingConfig(
+            synset_id=synset_id, resolution=(FLAGS.image_res,) * 2, seed=seed
+        ),
+        voxels=core.FrustumVoxelConfig(
+            synset_id=synset_id, resolution=FLAGS.vox_res, seed=seed
+        ),
+    )
+    builders = {k: core.ShapenetCore(config=config) for k, config in configs.items()}
     for b in builders.values():
         b.download_and_prepare()
 
@@ -40,12 +38,14 @@ def main(_):
 
         def vis(example):
             import matplotlib.pyplot as plt
-            image = example['image'].numpy()
-            voxels = tf.reduce_any(example['voxels'], axis=-1)
+
+            image = example["image"].numpy()
+            voxels = tf.reduce_any(example["voxels"], axis=-1)
             voxels = tf.image.resize(
                 tf.expand_dims(tf.cast(voxels, tf.uint8), axis=-1),
                 image.shape[:2],
-                method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+                method=tf.image.ResizeMethod.NEAREST_NEIGHBOR,
+            )
             voxels = tf.cast(tf.squeeze(voxels, axis=-1), tf.bool).numpy()
             # voxels = voxels.T
             # voxels = voxels[:, -1::-1]
@@ -54,8 +54,7 @@ def main(_):
             plt.show()
 
         datasets = {
-            k: b.as_dataset(split='train',
-                            shuffle_files=False).map(lambda x: x[k])
+            k: b.as_dataset(split="train", shuffle_files=False).map(lambda x: x[k])
             for k, b in builders.items()
         }
         dataset = tf.data.Dataset.zip(datasets)
@@ -63,5 +62,5 @@ def main(_):
             vis(example)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run(main)

@@ -1,7 +1,7 @@
 """Tests for shapenet_part dataset module."""
-import os
-import six
+
 from tensorflow_datasets import testing
+
 from shape_tfds.shape.shapenet import part
 
 splits = {"train": 4, "test": 2, "validation": 2}

@@ -1,17 +1,16 @@
 """Requires difference trimesh fork."""
 import contextlib
-import os
-import time
+
 import numpy as np
 import tensorflow_datasets as tfds
-import shape_tfds as sds
-from shape_tfds.shape.shapenet.core import base
-from shape_tfds.core.features import BinaryVoxel
-from shape_tfds.shape.shapenet.core import views
-from shape_tfds.shape.shapenet.core import voxel as voxel_lib
 import trimesh
 
-trimesh.util.log.setLevel('ERROR')
+import shape_tfds as sds
+from shape_tfds.core.features import BinaryVoxel
+from shape_tfds.shape.shapenet.core import base, views
+from shape_tfds.shape.shapenet.core import voxel as voxel_lib
+
+trimesh.util.log.setLevel("ERROR")
 
 # def frustum_matrix(near, far, left, right, bottom, top):
 #     # http://www.songho.ca/opengl/gl_projectionmatrix.html
@@ -30,22 +29,22 @@ trimesh.util.log.setLevel('ERROR')
 
 def _get_voxel_transform(resolution):
     diag = 1 / (resolution - 1)
-    return np.array([[diag, 0, 0, -0.5], [0, diag, 0, -0.5], [0, 0, diag, -0.5],
-                     [0, 0, 0, 1]])
+    return np.array(
+        [[diag, 0, 0, -0.5], [0, diag, 0, -0.5], [0, 0, diag, -0.5], [0, 0, 0, 1]]
+    )
 
 
 class FrustumVoxelConfig(base.ShapenetCoreConfig):
-
-    def __init__(self, synset_id, resolution=64, seed=0,
-                 use_cached_voxels=True):
+    def __init__(self, synset_id, resolution=64, seed=0, use_cached_voxels=True):
         self._seed = seed
         self._resolution = resolution
         self._use_cached_voxels = use_cached_voxels
         super(FrustumVoxelConfig, self).__init__(
             synset_id=synset_id,
-            name='frustum_voxels-%d-%s-%d' % (resolution, synset_id, seed),
-            description='shapenet core frustum voxels',
-            version=tfds.core.Version("0.0.1"))
+            name="frustum_voxels-%d-%s-%d" % (resolution, synset_id, seed),
+            description="shapenet core frustum voxels",
+            version=tfds.core.Version("0.0.1"),
+        )
 
     @property
     def features(self):
@@ -58,20 +57,26 @@ class FrustumVoxelConfig(base.ShapenetCoreConfig):
     @contextlib.contextmanager
     def lazy_mapping(self, dl_manager=None):
         from shape_tfds.core.collection_utils.mapping import ItemMappedMapping
+
         if dl_manager is None:
             dl_manager = sds.core.downloads.get_dl_manager()
         view_fn = views.random_view_fn(seed_offset=self._seed)
         transform = _get_voxel_transform(self._resolution)
 
         def item_map_fn(key, data):
-            voxels = trimesh.voxel.VoxelGrid(data['voxels'],
-                                             transform=transform)
+            voxels = trimesh.voxel.VoxelGrid(data["voxels"], transform=transform)
             scene = trimesh.primitives.Sphere().scene()
-            return dict(voxels=transform_voxels(
-                scene, voxels, self._resolution, position=view_fn(key)))
+            return dict(
+                voxels=transform_voxels(
+                    scene, voxels, self._resolution, position=view_fn(key)
+                )
+            )
 
-        base_builder = base.ShapenetCore(config=voxel_lib.VoxelConfig(
-            synset_id=self.synset_id, resolution=self.resolution))
+        base_builder = base.ShapenetCore(
+            config=voxel_lib.VoxelConfig(
+                synset_id=self.synset_id, resolution=self.resolution
+            )
+        )
 
         # living dangerously
         base_dl_manager = tfds.core.download.DownloadManager(
@@ -86,7 +91,8 @@ class FrustumVoxelConfig(base.ShapenetCoreConfig):
         if self._use_cached_voxels:
             base_builder.create_cache(dl_manager=base_dl_manager)
             context = base_builder.builder_config.cache_mapping(
-                base_builder.cache_dir, 'r')
+                base_builder.cache_dir, "r"
+            )
         else:
             context = base_builder.builder_config.lazy_mapping(base_dl_manager)
         with context as src:
@@ -104,5 +110,7 @@ def transform_voxels(scene, voxels, resolution, position):
     coords += origin
 
     frust_vox_dense = voxels.is_filled(coords)
-    frust_vox_dense = frust_vox_dense.transpose((1, 0, 2))  # y, x, z  # pylint: disable=no-member
+    frust_vox_dense = frust_vox_dense.transpose(
+        (1, 0, 2)
+    )  # y, x, z  # pylint: disable=no-member
     return frust_vox_dense

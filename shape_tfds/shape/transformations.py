@@ -14,10 +14,16 @@ def _look_at_nh_helper(eye, center=None, world_up=None, dtype=None, axis=-1):
     else:
         eye = np.asanyarray(eye, dtype=dtype)
 
-    center = np.zeros((3,), dtype=dtype) if center is None else \
-        np.asanyarray(center, dtype=dtype)
-    world_up = np.array([0, 0, 1], dtype=dtype) if world_up is None else \
-        np.asanyarray(world_up, dtype=dtype)
+    center = (
+        np.zeros((3,), dtype=dtype)
+        if center is None
+        else np.asanyarray(center, dtype=dtype)
+    )
+    world_up = (
+        np.array([0, 0, 1], dtype=dtype)
+        if world_up is None
+        else np.asanyarray(world_up, dtype=dtype)
+    )
 
     # https://web.cs.wpi.edu/~emmanuel/courses/cs543/f13/slides/lecture04_p3.pdf
     n = normalized(eye - center)
@@ -41,10 +47,10 @@ def look_at_nh(eye, center=None, world_up=None, dtype=None):
 
 
 def _from_nh(R, t):
-    return np.concatenate([
-        np.concatenate([R, np.expand_dims(t, axis=-1)], axis=-1), [[0, 0, 0, 1]]
-    ],
-                          axis=0)
+    return np.concatenate(
+        [np.concatenate([R, np.expand_dims(t, axis=-1)], axis=-1), [[0, 0, 0, 1]]],
+        axis=0,
+    )
 
 
 def look_at(eye, center=None, world_up=None, dtype=None):

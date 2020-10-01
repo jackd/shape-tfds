@@ -1,11 +1,12 @@
-import numpy as np
 import tensorflow as tf
+
 from shape_tfds.shape.shapenet import core
+
 tf.compat.v1.enable_eager_execution()
 
 ids, names = core.load_synset_ids()
 seed_offset = 0
-synset_name = 'suitcase'
+synset_name = "suitcase"
 # name = 'watercraft'
 # name = 'aeroplane'
 # name = 'table'
@@ -15,11 +16,10 @@ ny, nx = resolution
 
 
 def vis(image, voxels):
-    # visualize a single image/voxel pair
+    """visualize a single image/voxel pair."""
     import matplotlib.pyplot as plt
-    # This import registers the 3D projection, but is otherwise unused.
-    from mpl_toolkits.mplot3d import Axes3D
 
+    # This import registers the 3D projection, but is otherwise unused.
     # and plot everything
     fig = plt.figure()
     ax = fig.gca()
@@ -34,25 +34,26 @@ def vis(image, voxels):
 
 synset_id = ids[synset_name]
 
-configs = dict(image=core.TrimeshRenderingConfig(
-    synset_id=synset_id,
-    resolution=resolution,
-    view_fn=core.views.random_view_fn(seed_offset)),
-               voxels=core.VoxelConfig(synset_id, resolution=32))
-builders = {
-    k: core.ShapenetCore(config=config) for k, config in configs.items()
-}
+configs = dict(
+    image=core.TrimeshRenderingConfig(
+        synset_id=synset_id,
+        resolution=resolution,
+        view_fn=core.views.random_view_fn(seed_offset),
+    ),
+    voxels=core.VoxelConfig(synset_id, resolution=32),
+)
+builders = {k: core.ShapenetCore(config=config) for k, config in configs.items()}
 for b in builders.values():
     b.download_and_prepare()
 
 datasets = {
-    k: b.as_dataset(split='train', shuffle_files=False).map(lambda x: x[k])
+    k: b.as_dataset(split="train", shuffle_files=False).map(lambda x: x[k])
     for k, b in builders.items()
 }
 
 dataset = tf.data.Dataset.zip(datasets)
 
 for example in dataset:
-    image = example['image'].numpy()
-    voxels = example['voxels'].numpy()
+    image = example["image"].numpy()
+    voxels = example["voxels"].numpy()
     vis(image, voxels)

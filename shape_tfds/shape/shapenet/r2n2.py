@@ -8,17 +8,18 @@ interpretation). See
 regarding the consistency/accuracy of the values.
 """
 
-from absl import logging
-import os
-import six
 import contextlib
-import numpy as np
-import tensorflow as tf
+import os
 
+import numpy as np
+import six
+import tensorflow as tf
 import tensorflow_datasets.public_api as tfds
-from tensorflow_datasets.core import lazy_imports
-import shape_tfds as sds
 import trimesh
+from absl import logging
+from tensorflow_datasets.core import lazy_imports
+
+import shape_tfds as sds
 
 VOXEL_SHAPE = (32, 32, 32)
 RENDERINGS_PER_EXAMPLE = 24
@@ -46,49 +47,51 @@ def synset_names():
 def synset_id(name):
     """Get the synset id for the given id.
 
-  If `name` is not a valid name but is a valid id, returns it instead.
+    If `name` is not a valid name but is a valid id, returns it instead.
 
-  Args:
-    name: string name, e.g. "sofa"
+    Args:
+      name: string name, e.g. "sofa"
 
-  Returns:
-    string synset id, e.g. "04256520"
+    Returns:
+      string synset id, e.g. "04256520"
 
-  Raises:
-    ValueError if `name` is not a valid synset id or name.
-  """
+    Raises:
+      ValueError if `name` is not a valid synset id or name.
+    """
     if name in _synset_ids:
         return _synset_ids[name]
     elif name in _synset_names:
         return name
     else:
-        raise ValueError("'%s' is not a valid synset name or id."
-                         "\nValid synset `id: name`s:\n%s" %
-                         (name, _valid_synsets_string()))
+        raise ValueError(
+            "'%s' is not a valid synset name or id."
+            "\nValid synset `id: name`s:\n%s" % (name, _valid_synsets_string())
+        )
 
 
 def synset_name(id_):
     """Get the synset name for the given synset id.
 
-  If `id_` is not a valid id_ but is a valid name, returns it instead.
+    If `id_` is not a valid id_ but is a valid name, returns it instead.
 
-  Args:
-    id_: string id, e.g. "04256520"
+    Args:
+      id_: string id, e.g. "04256520"
 
-  Returns:
-    string synset name, e.g. "sofa"
+    Returns:
+      string synset name, e.g. "sofa"
 
-  Raises:
-    ValueError if `id_` is not a valid synset id or name.
-  """
+    Raises:
+      ValueError if `id_` is not a valid synset id or name.
+    """
     if id_ in _synset_ids:
         return id_
     elif id_ in _synset_names:
         return _synset_names[id_]
     else:
-        raise ValueError("'%s' is not a valid synset name or id."
-                         "\nValid synset `id: name`s:\n%s" %
-                         (id_, _valid_synsets_string()))
+        raise ValueError(
+            "'%s' is not a valid synset name or id."
+            "\nValid synset `id: name`s:\n%s" % (id_, _valid_synsets_string())
+        )
 
 
 _CITATION = """
@@ -113,15 +116,14 @@ _synset_ids = {
     "speaker": "03691459",
     "table": "04379243",
     "telephone": "04401088",
-    "watercraft": "04530566"
+    "watercraft": "04530566",
 }
 
 _synset_names = {v: k for k, v in _synset_ids.items()}
 
 
 def _valid_synsets_string():
-    return "\n".join(
-        '%s : %s' % (_synset_ids[k], k) for k in sorted(_synset_ids))
+    return "\n".join("%s : %s" % (_synset_ids[k], k) for k in sorted(_synset_ids))
 
 
 _TRAIN_FRAC = 0.8
@@ -135,27 +137,29 @@ def _get_id_split(example_ids):
 
 
 class ShapenetR2n2Config(tfds.core.BuilderConfig):
-
     def __init__(self, synset):
         """Create the config object for `ShapenetR2n2` `DatasetBuilder`.
 
-    Args:
-      synset: str, synset name or id
-    """
-        assert (isinstance(synset, six.string_types))
+        Args:
+          synset: str, synset name or id
+        """
+        assert isinstance(synset, six.string_types)
         self.synset_id = synset_id(synset)
         self.synset_name = synset_name(synset)
         super(ShapenetR2n2Config, self).__init__(
             name=self.synset_id,
             version=tfds.core.Version("0.0.1"),
             description=(
-                "Multi-view renderings/voxels for ShapeNet synset %s (%s)" %
-                (self.synset_name, self.synset_id)))
+                "Multi-view renderings/voxels for ShapeNet synset %s (%s)"
+                % (self.synset_name, self.synset_id)
+            ),
+        )
 
 
 def load_meta(renderings_dir, model_id):
-    meta_path = os.path.join(renderings_dir, model_id, "rendering",
-                             "rendering_metadata.txt")
+    meta_path = os.path.join(
+        renderings_dir, model_id, "rendering", "rendering_metadata.txt"
+    )
     with tf.io.gfile.GFile(meta_path, "rb") as fp:
         meta = np.loadtxt(fp)
     return meta.astype(np.float32)
@@ -164,17 +168,18 @@ def load_meta(renderings_dir, model_id):
 def load_voxels(voxels_dir, model_id):
     binvox_path = os.path.join(voxels_dir, model_id, "model.binvox")
     with tf.io.gfile.GFile(binvox_path, mode="rb") as fp:
-        voxel = trimesh.load(fp, file_type='binvox')
+        voxel = trimesh.load(fp, file_type="binvox")
     return voxel.encoding.dense
 
 
 def load_image(renderings_dir, model_id, image_index):
-    image_path = os.path.join(renderings_dir, model_id, "rendering",
-                              "%02d.png" % image_index)
+    image_path = os.path.join(
+        renderings_dir, model_id, "rendering", "%02d.png" % image_index
+    )
     with tf.io.gfile.GFile(image_path, "rb") as fp:
         image = np.array(lazy_imports.PIL_Image.open(fp))  # pylint: disable=no-member
     # tfds image features can't have 4 channels.
-    background = (image[..., -1] == 0)
+    background = image[..., -1] == 0
     image = image[..., :3]
     image[background] = BACKGROUND_COLOR
     return image
@@ -189,26 +194,32 @@ class ShapenetR2n2(tfds.core.GeneratorBasedBuilder):
 
     def _info(self):
         features = tfds.features.FeaturesDict(
-            dict(synset_id=tfds.features.ClassLabel(names=synset_ids()),
-                 model_id=tfds.features.Text(),
-                 voxels=sds.core.features.BinaryVoxel(VOXEL_SHAPE),
-                 renderings=tfds.features.Sequence(
-                     dict(image=tfds.features.Image(shape=IMAGE_SHAPE),
-                          meta=tfds.features.Tensor(shape=(5,),
-                                                    dtype=tf.float32)),
-                     length=RENDERINGS_PER_EXAMPLE)))
+            dict(
+                synset_id=tfds.features.ClassLabel(names=synset_ids()),
+                model_id=tfds.features.Text(),
+                voxels=sds.core.features.BinaryVoxel(VOXEL_SHAPE),
+                renderings=tfds.features.Sequence(
+                    dict(
+                        image=tfds.features.Image(shape=IMAGE_SHAPE),
+                        meta=tfds.features.Tensor(shape=(5,), dtype=tf.float32),
+                    ),
+                    length=RENDERINGS_PER_EXAMPLE,
+                ),
+            )
+        )
 
         return tfds.core.DatasetInfo(
             builder=self,
-            description=("Shapenet is a large collection of 3D CAD models. "
-                         "This dataset provides renderings and voxelizations "
-                         "of a subset of 13 categories as used by Choy et al."),
+            description=(
+                "Shapenet is a large collection of 3D CAD models. "
+                "This dataset provides renderings and voxelizations "
+                "of a subset of 13 categories as used by Choy et al."
+            ),
             features=features,
             supervised_keys=("renderings", "voxels"),
-            urls=[
-                "http://cvgl.stanford.edu/3d-r2n2/", "https://www.shapenet.org/"
-            ],
-            citation=_CITATION)
+            urls=["http://cvgl.stanford.edu/3d-r2n2/", "https://www.shapenet.org/"],
+            citation=_CITATION,
+        )
 
     def _split_generators(self, dl_manager):
         # Unfortunately the files at these urls are twice the size they need to be
@@ -216,17 +227,17 @@ class ShapenetR2n2(tfds.core.GeneratorBasedBuilder):
         # everything in the rest of the outer archive.
         resources = dict(
             voxels="http://cvgl.stanford.edu/data2/ShapeNetVox32.tgz",
-            renderings="http://cvgl.stanford.edu/data2/ShapeNetRendering.tgz")
+            renderings="http://cvgl.stanford.edu/data2/ShapeNetRendering.tgz",
+        )
 
         data_dirs = dl_manager.download_and_extract(resources)
-        base_renderings_dir = os.path.join(data_dirs["renderings"],
-                                           "ShapeNetRendering")
+        base_renderings_dir = os.path.join(data_dirs["renderings"], "ShapeNetRendering")
         base_voxels_dir = os.path.join(data_dirs["voxels"], "ShapeNetVox32")
 
         # We manually delete the inner duplicate archive after extraction
         duplicate_paths = [
             os.path.join(base_renderings_dir, "rendering_only.tgz"),
-            os.path.join(base_voxels_dir, "binvox.tgz")
+            os.path.join(base_voxels_dir, "binvox.tgz"),
         ]
         for path in duplicate_paths:
             if tf.io.gfile.exists(path):
@@ -243,21 +254,23 @@ class ShapenetR2n2(tfds.core.GeneratorBasedBuilder):
         )
 
         return [
-            tfds.core.SplitGenerator(name=tfds.Split.TRAIN,
-                                     gen_kwargs=dict(model_ids=train_ids,
-                                                     **kwargs)),
-            tfds.core.SplitGenerator(name=tfds.Split.TEST,
-                                     gen_kwargs=dict(model_ids=test_ids,
-                                                     **kwargs))
+            tfds.core.SplitGenerator(
+                name=tfds.Split.TRAIN, gen_kwargs=dict(model_ids=train_ids, **kwargs)
+            ),
+            tfds.core.SplitGenerator(
+                name=tfds.Split.TEST, gen_kwargs=dict(model_ids=test_ids, **kwargs)
+            ),
         ]
 
     def _generate_examples(self, **kwargs):
         gen = self._generate_example_data(**kwargs)
-        return ((((v['synset_id'], v['model_id']), v) for v in gen)
-                if self.version.implements(tfds.core.Experiment.S3) else gen)
+        return (
+            (((v["synset_id"], v["model_id"]), v) for v in gen)
+            if self.version.implements(tfds.core.Experiment.S3)
+            else gen
+        )
 
-    def _generate_example_data(self, synset_id, model_ids, voxels_dir,
-                               renderings_dir):
+    def _generate_example_data(self, synset_id, model_ids, voxels_dir, renderings_dir):
 
         for model_id in model_ids:
             images = [
@@ -266,10 +279,12 @@ class ShapenetR2n2(tfds.core.GeneratorBasedBuilder):
             ]
             voxels = load_voxels(voxels_dir, model_id)
             meta = load_meta(renderings_dir, model_id)
-            yield dict(voxels=voxels,
-                       renderings=dict(image=images, meta=meta),
-                       model_id=model_id,
-                       synset_id=synset_id)
+            yield dict(
+                voxels=voxels,
+                renderings=dict(image=images, meta=meta),
+                model_id=model_id,
+                synset_id=synset_id,
+            )
 
 
 @contextlib.contextmanager
@@ -281,73 +296,81 @@ def temp_random_state(seed=123):
 
 
 class ShapenetR2n2CloudConfig(tfds.core.BuilderConfig):
-
     def __init__(self, synset, num_points):
         """Create the config object for `ShapenetR2n2Cloud` `DatasetBuilder`.
 
         Args:
         synset: str, synset name or id
         """
-        assert (isinstance(synset, six.string_types))
-        assert (isinstance(num_points, int) and num_points > 0)
+        assert isinstance(synset, six.string_types)
+        assert isinstance(num_points, int) and num_points > 0
         self.synset_id = synset_id(synset)
         self.synset_name = synset_name(synset)
         self.num_points = num_points
         super(ShapenetR2n2CloudConfig, self).__init__(
-            name='{}-c{}'.format(self.synset_id, num_points),
+            name="{}-c{}".format(self.synset_id, num_points),
             version=tfds.core.Version("0.0.1"),
-            description=("Multi-view renderings/cloud for ShapeNet synset "
-                         "{} ({}), {} points".format(self.synset_name,
-                                                     self.synset_id,
-                                                     self.num_points)))
+            description=(
+                "Multi-view renderings/cloud for ShapeNet synset "
+                "{} ({}), {} points".format(
+                    self.synset_name, self.synset_id, self.num_points
+                )
+            ),
+        )
 
 
 class ShapenetR2n2Cloud(ShapenetR2n2):
-
     def _info(self):
         features = tfds.features.FeaturesDict(
-            dict(synset_id=tfds.features.ClassLabel(names=synset_ids()),
-                 model_id=tfds.features.Text(),
-                 points=tfds.features.Tensor(
-                     shape=(self.builder_config.num_points, 3),
-                     dtype=tf.float32),
-                 renderings=tfds.features.Sequence(
-                     dict(image=tfds.features.Image(shape=IMAGE_SHAPE),
-                          meta=tfds.features.Tensor(shape=(5,),
-                                                    dtype=tf.float32)),
-                     length=RENDERINGS_PER_EXAMPLE)))
+            dict(
+                synset_id=tfds.features.ClassLabel(names=synset_ids()),
+                model_id=tfds.features.Text(),
+                points=tfds.features.Tensor(
+                    shape=(self.builder_config.num_points, 3), dtype=tf.float32
+                ),
+                renderings=tfds.features.Sequence(
+                    dict(
+                        image=tfds.features.Image(shape=IMAGE_SHAPE),
+                        meta=tfds.features.Tensor(shape=(5,), dtype=tf.float32),
+                    ),
+                    length=RENDERINGS_PER_EXAMPLE,
+                ),
+            )
+        )
 
         return tfds.core.DatasetInfo(
             builder=self,
-            description=("Shapenet is a large collection of 3D CAD models. "
-                         "This dataset provides renderings and sampled point "
-                         "clouds of a subset of 13 categories as used by "
-                         "Choy et al."),
+            description=(
+                "Shapenet is a large collection of 3D CAD models. "
+                "This dataset provides renderings and sampled point "
+                "clouds of a subset of 13 categories as used by "
+                "Choy et al."
+            ),
             features=features,
             supervised_keys=("renderings", "points"),
-            urls=[
-                "http://cvgl.stanford.edu/3d-r2n2/", "https://www.shapenet.org/"
-            ],
-            citation=_CITATION)
+            urls=["http://cvgl.stanford.edu/3d-r2n2/", "https://www.shapenet.org/"],
+            citation=_CITATION,
+        )
 
     def _split_generators(self, dl_manager):
         from shape_tfds.shape.shapenet.core.base import cloud_loader_context
+
         # Unfortunately the files at these urls are twice the size they need to
         # be since the archives contain an inner archive containing almost
         # everything in the rest of the outer archive.
         resources = dict(
             voxels="http://cvgl.stanford.edu/data2/ShapeNetVox32.tgz",
-            renderings="http://cvgl.stanford.edu/data2/ShapeNetRendering.tgz")
+            renderings="http://cvgl.stanford.edu/data2/ShapeNetRendering.tgz",
+        )
 
         data_dirs = dl_manager.download_and_extract(resources)
-        base_renderings_dir = os.path.join(data_dirs["renderings"],
-                                           "ShapeNetRendering")
+        base_renderings_dir = os.path.join(data_dirs["renderings"], "ShapeNetRendering")
         base_voxels_dir = os.path.join(data_dirs["voxels"], "ShapeNetVox32")
 
         # We manually delete the inner duplicate archive after extraction
         duplicate_paths = [
             os.path.join(base_renderings_dir, "rendering_only.tgz"),
-            os.path.join(base_voxels_dir, "binvox.tgz")
+            os.path.join(base_voxels_dir, "binvox.tgz"),
         ]
         for path in duplicate_paths:
             if tf.io.gfile.exists(path):
@@ -359,23 +382,24 @@ class ShapenetR2n2Cloud(ShapenetR2n2):
         train_ids, test_ids = _get_id_split(model_ids)
 
         num_points = self.builder_config.num_points
-        kwargs = dict(synset_id=synset_id,
-                      renderings_dir=os.path.join(base_renderings_dir,
-                                                  synset_id),
-                      loader_context=cloud_loader_context(
-                          synset_id, num_points, dl_manager))
+        kwargs = dict(
+            synset_id=synset_id,
+            renderings_dir=os.path.join(base_renderings_dir, synset_id),
+            loader_context=cloud_loader_context(synset_id, num_points, dl_manager),
+        )
 
         return [
-            tfds.core.SplitGenerator(name=tfds.Split.TRAIN,
-                                     gen_kwargs=dict(model_ids=train_ids,
-                                                     **kwargs)),
-            tfds.core.SplitGenerator(name=tfds.Split.TEST,
-                                     gen_kwargs=dict(model_ids=test_ids,
-                                                     **kwargs))
+            tfds.core.SplitGenerator(
+                name=tfds.Split.TRAIN, gen_kwargs=dict(model_ids=train_ids, **kwargs)
+            ),
+            tfds.core.SplitGenerator(
+                name=tfds.Split.TEST, gen_kwargs=dict(model_ids=test_ids, **kwargs)
+            ),
         ]
 
-    def _generate_example_data(self, synset_id, model_ids, renderings_dir,
-                               loader_context):
+    def _generate_example_data(
+        self, synset_id, model_ids, renderings_dir, loader_context
+    ):
         with loader_context as loader:
             with temp_random_state():
 
@@ -390,16 +414,18 @@ class ShapenetR2n2Cloud(ShapenetR2n2):
                         points = None
                     if points is None:
                         logging.warning(
-                            'Failed to load model {}, skipping'.format(
-                                model_id))
+                            "Failed to load model {}, skipping".format(model_id)
+                        )
                         continue
                     if np.any(np.isnan(points)):
                         logging.warning(
-                            'NaN value detected in model {}, skipping'.format(
-                                model_id))
+                            "NaN value detected in model {}, skipping".format(model_id)
+                        )
                         continue
                     meta = load_meta(renderings_dir, model_id)
-                    yield dict(points=points,
-                               renderings=dict(image=images, meta=meta),
-                               model_id=model_id,
-                               synset_id=synset_id)
+                    yield dict(
+                        points=points,
+                        renderings=dict(image=images, meta=meta),
+                        model_id=model_id,
+                        synset_id=synset_id,
+                    )

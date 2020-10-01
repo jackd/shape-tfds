@@ -1,7 +1,9 @@
-from shape_tfds.core.features.run_length_encoded_feature import BinaryRunLengthEncodedFeature
-from shape_tfds.core.features.run_length_encoded_feature import RunLengthEncodedFeature
-from shape_tfds.core.features.shaped_tensor import DynamicShapedTensor
-from shape_tfds.core.features.shaped_tensor import ShapedTensor
-from shape_tfds.core.features.shaped_tensor import StaticShapedTensor
-from shape_tfds.core.features.padded_tensor_feature import PaddedTensor
-from shape_tfds.core.features.voxel import BinaryVoxel
+from shape_tfds.core.features.run_length_encoded_feature import (
+    BinaryRunLengthEncodedFeature,
+    RunLengthEncodedFeature,
+)
+from shape_tfds.core.features.shaped_tensor import (
+    DynamicShapedTensor,
+    ShapedTensor,
+    StaticShapedTensor,
+)

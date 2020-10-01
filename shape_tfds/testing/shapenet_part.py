@@ -14,30 +14,30 @@
 # limitations under the License.
 r"""Generate shapenet-like files with random data."""
 
-from absl import app
-
-import os
 import json
+import os
 import random
 
 import numpy as np
 import tensorflow as tf
-
-from tensorflow_datasets.testing import test_utils
-from shape_tfds.shape.shapenet.core import load_synset_ids
-from shape_tfds.shape.shapenet.part import NUM_PART_CLASSES
-from shape_tfds.shape.shapenet.part import PART_SYNSET_IDS
-from shape_tfds.shape.shapenet import part_test
+from absl import app
 from tensorflow_datasets.core.utils import py_utils
+from tensorflow_datasets.testing import test_utils
 
-fake_examples_dir = os.path.join(py_utils.tfds_dir(), "testing", "test_data",
-                                 "fake_examples")
+from shape_tfds.shape.shapenet import part_test
+from shape_tfds.shape.shapenet.part import NUM_PART_CLASSES, PART_SYNSET_IDS
+
+fake_examples_dir = os.path.join(
+    py_utils.tfds_dir(), "testing", "test_data", "fake_examples"
+)
 
 
 def make_part_data():
     base_dir = os.path.join(
-        fake_examples_dir, "shapenet_part2017",
-        "shapenetcore_partanno_segmentation_benchmark_v0_normal")
+        fake_examples_dir,
+        "shapenet_part2017",
+        "shapenetcore_partanno_segmentation_benchmark_v0_normal",
+    )
     test_utils.remake_dir(base_dir)
     split_dir = os.path.join(base_dir, "train_test_split")
     tf.io.gfile.makedirs(split_dir)
@@ -48,7 +48,7 @@ def make_part_data():
         paths = []
         synset_ids = random.sample(PART_SYNSET_IDS, num_examples)
         for synset_id in synset_ids:
-            filename = 'example%d.txt' % j
+            filename = "example%d.txt" % j
             j += 1
 
             subdir = os.path.join(base_dir, synset_id)
@@ -69,8 +69,8 @@ def make_part_data():
             paths.append(os.path.join("shape_data", synset_id, filename[:-4]))
 
         with tf.io.gfile.GFile(
-                os.path.join(split_dir, "shuffled_%s_file_list.json" % split),
-                "wb") as fp:
+            os.path.join(split_dir, "shuffled_%s_file_list.json" % split), "wb"
+        ) as fp:
             json.dump(paths, fp)
 
 

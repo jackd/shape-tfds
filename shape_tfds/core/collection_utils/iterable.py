@@ -2,7 +2,7 @@ def _first(iterator):
     try:
         return next(iterator)
     except StopIteration:
-        raise ValueError('iterable must not be empty to get first element')
+        raise ValueError("iterable must not be empty to get first element")
 
 
 def split(iterable):
@@ -14,12 +14,14 @@ def split(iterable):
     """
     it = iter(iterable)
     first = _first(it)
+
     def rest_fn():
         try:
             while True:
                 yield next(it)
         except StopIteration:
             pass
+
     rest = rest_fn()
     return first, rest
 
@@ -45,6 +47,6 @@ def single(iterable):
     first = _first(it)
     try:
         next(it)
-        raise ValueError('iterable had more than one entry')
+        raise ValueError("iterable had more than one entry")
     except StopIteration:
         return first

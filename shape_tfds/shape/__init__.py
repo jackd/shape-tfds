@@ -1,11 +1,8 @@
-from shape_tfds.shape import modelnet
-from shape_tfds.shape import shapenet
-from shape_tfds.shape import transformations
-from shape_tfds.shape import scan_object_nn
+from shape_tfds.shape import modelnet, scan_object_nn, shapenet, transformations
 
 __all__ = [
-    'modelnet',
-    'shapenet',
-    'transformations',
-    'scan_object_nn',
+    "modelnet",
+    "shapenet",
+    "transformations",
+    "scan_object_nn",
 ]
