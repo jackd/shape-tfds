@@ -22,6 +22,7 @@ setup(
     license="MIT",
     packages=find_packages(),
     requirements=install_requires,
+    python_requires=">=3.6, <4",
     include_package_data=True,
     package_data={"shape_tfds": DATASET_FILES}
     # zip_safe=False
