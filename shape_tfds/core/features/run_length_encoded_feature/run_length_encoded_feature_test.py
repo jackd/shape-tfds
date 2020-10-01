@@ -29,7 +29,9 @@ class RunLengthEncodedFeatureTest(test_utils.FeatureExpectationsTestCase):
         for dense, encoding in brle_dense_and_encodings:
             brle_items.append(
                 test_utils.FeatureExpectationItem(
-                    value=dense, expected=dense, expected_serialized=list(encoding),
+                    value=dense,
+                    expected=dense,
+                    # expected_serialized=list(encoding),
                 )
             )
 
@@ -60,7 +62,9 @@ class RunLengthEncodedFeatureTest(test_utils.FeatureExpectationsTestCase):
         for dense, encoding in rle_dense_and_encodings:
             rle_items.append(
                 test_utils.FeatureExpectationItem(
-                    value=dense, expected=dense, expected_serialized=list(encoding),
+                    value=dense,
+                    expected=dense,
+                    # expected_serialized=list(encoding),
                 )
             )
 

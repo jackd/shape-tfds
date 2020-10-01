@@ -17,6 +17,14 @@ def _assert_reshapable(src_shape, dst_shape):
         )
 
 
+def _assert_compatible_shape(shape: tf.TensorShape, example_shape):
+    if not shape.is_compatible_with(example_shape):
+        raise ValueError(
+            f"example shape {example_shape} is incompatible with "
+            f"feature shape {shape}"
+        )
+
+
 class StaticShapedTensor(top_level_feature.TopLevelFeature):
     def __init__(self, base_feature, shape):
         if not isinstance(shape, tuple):
@@ -39,11 +47,13 @@ class StaticShapedTensor(top_level_feature.TopLevelFeature):
             )
         self._base_feature = base_feature
         self._shape = shape
+        self._tensor_shape = tf.TensorShape(self._shape)
 
     def get_tensor_info(self):
         return features.TensorInfo(shape=self._shape, dtype=self._base_info.dtype)
 
     def encode_example(self, example_data):
+        _assert_compatible_shape(self._tensor_shape, example_data.shape)
         return self._base_feature.encode_example(
             np.reshape(
                 example_data, [-1 if s is None else s for s in self._base_info.shape]
@@ -81,6 +91,7 @@ class DynamicShapedTensor(features.FeatureConnector):
         self._shape_tuple = shape
         self._base = base_feature
         self._shape = features.Tensor(shape=(len(shape),), dtype=tf.int64)
+        self._tensor_shape = tf.TensorShape(shape)
 
     def get_tensor_info(self):
         return features.TensorInfo(shape=self._shape_tuple, dtype=self._base_info.dtype)
@@ -101,6 +112,7 @@ class DynamicShapedTensor(features.FeatureConnector):
         )
 
     def encode_example(self, example_data):
+        _assert_compatible_shape(self._tensor_shape, example_data.shape)
         base_data = np.reshape(
             example_data, [-1 if s is None else s for s in self._base_info.shape]
         )

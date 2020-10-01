@@ -21,10 +21,7 @@ class ShapedTensorTest(test_utils.FeatureExpectationsTestCase):
     def test_shape_static(self):
 
         np_input = np.random.rand(2, 3).astype(np.float32)
-        array_input = [
-            [1, 2, 3],
-            [4, 5, 6],
-        ]
+        array_input = np.arange(6, dtype=np.float32).reshape((2, 3))
 
         feature = sds_features.ShapedTensor(
             features.Tensor(shape=(6,), dtype=tf.float32), shape=(2, 3)
@@ -45,7 +42,7 @@ class ShapedTensorTest(test_utils.FeatureExpectationsTestCase):
                 test_utils.FeatureExpectationItem(
                     value=np.random.rand(2, 4).astype(np.float32),
                     raise_cls=ValueError,
-                    raise_msg="cannot reshape",
+                    raise_msg="is incompatible",
                 ),
             ],
         )
@@ -64,56 +61,55 @@ class ShapedTensorTest(test_utils.FeatureExpectationsTestCase):
                 test_utils.FeatureExpectationItem(
                     value=np_input_dynamic_1,
                     expected=np_input_dynamic_1,
-                    expected_serialized=np_input_dynamic_1.flatten(),
+                    # expected_serialized=np_input_dynamic_1.flatten()),
                 ),
                 test_utils.FeatureExpectationItem(
                     value=np_input_dynamic_2,
                     expected=np_input_dynamic_2,
-                    expected_serialized=np_input_dynamic_2.flatten(),
+                    # expected_serialized=np_input_dynamic_2.flatten(),
                 ),
             ],
         )
 
+    def test_shape_dynamic(self):
 
-#   def test_shape_dynamic(self):
+        np_input_dynamic_1 = np.random.randint(256, size=(2, 3, 2), dtype=np.int32)
+        np_input_dynamic_2 = np.random.randint(256, size=(5, 3, 2), dtype=np.int32)
+        feature = sds_features.ShapedTensor(
+            features.Tensor(shape=(None,), dtype=tf.int32), shape=(None, None, 2)
+        )
+        self.assertIsInstance(feature, sds_features.DynamicShapedTensor)
 
-#     np_input_dynamic_1 = np.random.randint(256, size=(2, 3, 2), dtype=np.int32)
-#     np_input_dynamic_2 = np.random.randint(256, size=(5, 3, 2), dtype=np.int32)
-#     feature = sds_features.ShapedTensor(
-#         features.Tensor(shape=(None,), dtype=tf.int32),
-#         shape=(None, None, 2))
-#     self.assertIsInstance(feature, sds_features.DynamicShapedTensor)
+        self.assertFeature(
+            feature=feature,
+            dtype=tf.int32,
+            shape=(None, None, 2),
+            tests=[
+                test_utils.FeatureExpectationItem(
+                    value=np_input_dynamic_1,
+                    expected=np_input_dynamic_1,
+                    # expected_serialized=dict(
+                    #   shape=np_input_dynamic_1.shape,
+                    #   flat_values=np_input_dynamic_1.flatten()
+                    # )
+                ),
+                test_utils.FeatureExpectationItem(
+                    value=np_input_dynamic_2,
+                    expected=np_input_dynamic_2,
+                    # expected_serialized=dict(
+                    #   shape=np_input_dynamic_2.shape,
+                    #   flat_values=np_input_dynamic_2.flatten()
+                    # )
+                ),
+                # Invalid shape
+                test_utils.FeatureExpectationItem(
+                    value=np.random.randint(256, size=(2, 3, 1), dtype=np.int32),
+                    raise_cls=ValueError,
+                    raise_msg="is incompatible",
+                ),
+            ],
+        )
 
-#     self.assertFeature(
-#         feature=feature,
-#         dtype=tf.int32,
-#         shape=(None, None, 2),
-#         tests=[
-#             test_utils.FeatureExpectationItem(
-#                 value=np_input_dynamic_1,
-#                 expected=np_input_dynamic_1,
-#                 expected_serialized=dict(
-#                   shape=np_input_dynamic_1.shape,
-#                   flat_values=np_input_dynamic_1.flatten()
-#                 )
-#             ),
-#             test_utils.FeatureExpectationItem(
-#                 value=np_input_dynamic_2,
-#                 expected=np_input_dynamic_2,
-#                 expected_serialized=dict(
-#                   shape=np_input_dynamic_2.shape,
-#                   flat_values=np_input_dynamic_2.flatten()
-#                 )
-#             ),
-#             # Invalid shape
-#             test_utils.FeatureExpectationItem(
-#                 value=
-#                 np.random.randint(256, size=(2, 3, 1), dtype=np.int32),
-#                 raise_cls=ValueError,
-#                 raise_msg='is incompatible',
-#             ),
-#         ]
-#     )
 
 if __name__ == "__main__":
     test_main()
