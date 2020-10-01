@@ -5,7 +5,7 @@ import tensorflow as tf
 import tensorflow_datasets as tfds
 import trimesh
 
-from shape_tfds.core.features import BinaryVoxel
+from shape_tfds.core.features.voxel import BinaryVoxel
 from shape_tfds.shape.shapenet.core import base
 
 trimesh.util.log.setLevel("ERROR")

@@ -6,7 +6,7 @@ import tensorflow_datasets as tfds
 import trimesh
 
 import shape_tfds as sds
-from shape_tfds.core.features import BinaryVoxel
+from shape_tfds.core.features.voxel import BinaryVoxel
 from shape_tfds.shape.shapenet.core import base, views
 from shape_tfds.shape.shapenet.core import voxel as voxel_lib
 
