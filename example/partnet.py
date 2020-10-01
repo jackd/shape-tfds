@@ -1,7 +1,3 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import tensorflow_datasets as tfds
 from shape_tfds.shape.shapenet.partnet import Partnet
 

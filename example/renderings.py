@@ -1,9 +1,4 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
-from absl import app
-from absl import flags
+from absl import app, flags
 
 flags.DEFINE_string('synset', default='suitcase', help='synset name')
 flags.DEFINE_string('renderer', default='blender', help='renderer name')

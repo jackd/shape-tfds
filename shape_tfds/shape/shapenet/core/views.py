@@ -1,7 +1,3 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import numpy as np
 from shape_tfds.shape import transformations
 from shape_tfds.core import random as rand

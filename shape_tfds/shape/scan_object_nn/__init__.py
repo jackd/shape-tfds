@@ -5,10 +5,6 @@ Note the dataset is currently undergoing some cleaning and may be different to
 the final released version. See project page for details on downloading the
 data.
 """
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import os
 import tensorflow as tf
 import tensorflow_datasets as tfds

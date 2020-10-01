@@ -1,8 +1,7 @@
-tensorflow-datasets
+tensorflow-datasets==2
 trimesh>=3.1.0
 numpy
 networkx
-git+git://github.com/mmatl/pyopengl.git
 pyrender
 scipy
 Pillow

@@ -1,9 +1,3 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-import collections
-
-
 def flatten_dicts(input_dict):
     out = {}
     for k, v in input_dict.items():

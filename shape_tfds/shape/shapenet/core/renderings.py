@@ -3,10 +3,6 @@ Requires updated obj loader from trimesh (including jackd's edit).
 
 See https://github.com/mikedh/trimesh/pull/436
 """
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import abc
 from absl import logging
 import contextlib
