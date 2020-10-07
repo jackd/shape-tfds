@@ -10,7 +10,7 @@ from shape_tfds.shape.modelnet.base import (
     load_class_names,
 )
 from shape_tfds.shape.modelnet.pointnet import Pointnet
-from shape_tfds.shape.modelnet.pointnet2 import Pointnet2, Pointnet2Config
+from shape_tfds.shape.modelnet.pointnet2 import Pointnet2, Pointnet2Config, Pointnet2H5
 from shape_tfds.shape.modelnet.pointnet2 import get_config as get_pointnet2_config
 
 __all__ = [
@@ -26,5 +26,6 @@ __all__ = [
     "Pointnet",
     "Pointnet2",
     "Pointnet2Config",
+    "Pointnet2H5",
     "get_pointnet2_config",
 ]
