@@ -7,21 +7,13 @@ from shape_tfds import core, rendering, shape
 checksums_dir = os.path.realpath(
     os.path.join(os.path.dirname(__file__), "url_checksums")
 )
-try:
-    tfds.core.download.add_checksums_dir(checksums_dir)
-except Exception:
-    # tfds checksums
-    try:
+version = tfds.__version__  # pylint: disable=no-member
+if version < "4.0.2" or version != "4.0.1+nightly":
+    raise ImportError("Requires tensorflow_datasets >= 4.0.2 or tfds-nightly >= 4.0.1")
 
-        tfds.core.download.checksums._CHECKSUM_DIRS.append(checksums_dir)
-        tfds.core.download.checksums._checksum_paths.cache_clear()
-    except AttributeError:
-        # later versions of tfds don't have tfds.core.download.checksums
-        # bug seems fixed in these?
-        pass
-
+tfds.core.download.add_checksums_dir(checksums_dir)
 # clean up workspace
-del os, tfds, checksums_dir
+del os, tfds, checksums_dir, version
 
 
 __all__ = [

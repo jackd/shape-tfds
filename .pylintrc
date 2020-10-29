@@ -21,6 +21,7 @@ disable=
     no-value-for-parameter,
     unexpected-keyword-arg,
     redundant-keyword-arg,
+    too-few-public-methods,
 
 [format]
 

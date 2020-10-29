@@ -5,6 +5,7 @@ import tensorflow as tf
 import tensorflow_datasets as tfds
 
 from shape_tfds.shape.modelnet import base
+from shape_tfds.shape.modelnet.base import _URL_BASE
 
 
 class Pointnet2Config(base.CloudNormalConfig):
@@ -44,7 +45,7 @@ def get_config(num_classes=40):
 
 
 class Pointnet2(tfds.core.GeneratorBasedBuilder):
-    URLS = [base._URL_BASE, "http://stanford.edu/~rqi/pointnet2/"]
+    URLS = [_URL_BASE, "http://stanford.edu/~rqi/pointnet2/"]
     BUILDER_CONFIGS = [CONFIG10, CONFIG40]
     _CITATION = """\
 @article{qi2017pointnetplusplus,
@@ -87,6 +88,7 @@ class Pointnet2(tfds.core.GeneratorBasedBuilder):
 
     def _split_generators(self, dl_manager):
         res = "https://shapenet.cs.stanford.edu/media/modelnet40_normal_resampled.zip"
+        # data_dir = dl_manager.download_and_extract(res)
         data_dir = dl_manager.download_and_extract(res)
         data_dir = os.path.join(data_dir, "modelnet40_normal_resampled")
         out = []
@@ -230,3 +232,9 @@ class Pointnet2H5(tfds.core.GeneratorBasedBuilder):
                             face_indices=face_indices[i],
                         ),
                     )
+
+
+if __name__ == "__main__":
+    config = tfds.core.download.DownloadConfig(verify_ssl=False)
+    builder = Pointnet2H5()
+    builder.download_and_extract(download_config=config)
