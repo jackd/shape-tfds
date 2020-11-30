@@ -1,5 +1,7 @@
+import json
 import os
 
+import h5py
 import numpy as np
 import tensorflow as tf
 import tensorflow_datasets as tfds
@@ -117,9 +119,9 @@ class Pointnet2(tfds.core.GeneratorBasedBuilder):
             path = os.path.join(data_dir, label, "{}.txt".format(example_id))
             with tf.io.gfile.GFile(path, "rb") as fp:
                 data = np.loadtxt(fp, delimiter=",", dtype=np.float32)
-            positions, normals = np.split(
+            positions, normals = np.split(  # pylint: disable=unbalanced-tuple-unpacking
                 data, 2, axis=1
-            )  # pylint: disable=unbalanced-tuple-unpacking
+            )
             cloud = dict(positions=positions, normals=normals)
             yield (
                 "{}-{}".format(label, example_index),
@@ -130,7 +132,7 @@ class Pointnet2(tfds.core.GeneratorBasedBuilder):
 class Pointnet2H5(tfds.core.GeneratorBasedBuilder):
     """H5 variant - smaller, faster download/processing."""
 
-    URLS = [base._URL_BASE, "http://stanford.edu/~rqi/pointnet2/"]
+    URLS = [_URL_BASE, "http://stanford.edu/~rqi/pointnet2/"]
     _CITATION = """\
 @article{qi2017pointnetplusplus,
     title={PointNet++: Deep Hierarchical Feature Learning on Point Sets in a Metric Space},
@@ -204,10 +206,6 @@ class Pointnet2H5(tfds.core.GeneratorBasedBuilder):
         return out
 
     def _generate_examples(self, data_dir, paths):
-        import json
-
-        import h5py
-
         for json_path, h5_path in paths:
             json_path = os.path.join(data_dir, json_path)
             with tf.io.gfile.GFile(json_path, "rb") as fp:
