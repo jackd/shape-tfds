@@ -1,3 +1,4 @@
+tensorflow-datasets>=4.0.1
 trimesh>=3.1.0
 numpy
 networkx
