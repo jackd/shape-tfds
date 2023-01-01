@@ -4,8 +4,8 @@ import os
 import h5py
 import numpy as np
 import tensorflow as tf
-import tensorflow_datasets as tfds
 
+import tensorflow_datasets as tfds
 from shape_tfds.shape.modelnet import base
 from shape_tfds.shape.modelnet.base import _URL_BASE
 
@@ -17,10 +17,10 @@ class Pointnet2Config(base.CloudNormalConfig):
         num_points = 10000
         self._num_classes = num_classes
         super(Pointnet2Config, self).__init__(
-            name="presampled%d-%d" % (num_classes, num_points),
+            name=f"presampled{num_classes}-{num_points}",
             num_points=num_points,
             description=(
-                "%d-class sampled 10000-point cloud used by PointNet++" % num_classes
+                f"{num_classes}-class sampled 10000-point cloud used by PointNet++"
             ),
             version=tfds.core.utils.Version("0.0.1"),
         )
@@ -90,25 +90,18 @@ class Pointnet2(tfds.core.GeneratorBasedBuilder):
 
     def _split_generators(self, dl_manager):
         res = "https://shapenet.cs.stanford.edu/media/modelnet40_normal_resampled.zip"
-        # data_dir = dl_manager.download_and_extract(res)
         data_dir = dl_manager.download_and_extract(res)
         data_dir = os.path.join(data_dir, "modelnet40_normal_resampled")
-        out = []
+        out = {}
         num_classes = self.num_classes
         for split, key in (
             (tfds.Split.TRAIN, "train"),
             (tfds.Split.TEST, "test"),
         ):
-            split_path = os.path.join(
-                data_dir, "modelnet{}_{}.txt".format(num_classes, key)
-            )
+            split_path = os.path.join(data_dir, f"modelnet{num_classes}_{key}.txt")
             with tf.io.gfile.GFile(split_path, "r") as fp:
                 example_ids = [l for l in fp.read().split("\n") if l != ""]
-            gen = tfds.core.SplitGenerator(
-                name=split, gen_kwargs=dict(example_ids=example_ids, data_dir=data_dir)
-            )
-            gen.split_info.statistics.num_examples = len(example_ids)
-            out.append(gen)
+            out[split] = self._generate_examples(example_ids, data_dir)
         return out
 
     def _generate_examples(self, example_ids, data_dir):
@@ -116,7 +109,7 @@ class Pointnet2(tfds.core.GeneratorBasedBuilder):
             split_id = example_id.split("_")
             label = "_".join(split_id[:-1])
             example_index = int(split_id[-1]) - 1
-            path = os.path.join(data_dir, label, "{}.txt".format(example_id))
+            path = os.path.join(data_dir, label, f"{example_id}.txt")
             with tf.io.gfile.GFile(path, "rb") as fp:
                 data = np.loadtxt(fp, delimiter=",", dtype=np.float32)
             positions, normals = np.split(  # pylint: disable=unbalanced-tuple-unpacking
@@ -124,7 +117,7 @@ class Pointnet2(tfds.core.GeneratorBasedBuilder):
             )
             cloud = dict(positions=positions, normals=normals)
             yield (
-                "{}-{}".format(label, example_index),
+                (label, example_index),
                 dict(cloud=cloud, label=label, example_index=example_index),
             )
 
@@ -186,26 +179,22 @@ class Pointnet2H5(tfds.core.GeneratorBasedBuilder):
         res = "https://shapenet.cs.stanford.edu/media/modelnet40_ply_hdf5_2048.zip"
         data_dir = dl_manager.download_and_extract(res)
         data_dir = os.path.join(data_dir, "modelnet40_ply_hdf5_2048")
-        out = []
+        out = {}
         all_paths = tf.io.gfile.listdir(data_dir)
         json_paths = [p for p in all_paths if p.endswith(".json")]
         h5_paths = [p for p in all_paths if p.endswith(".h5")]
-        for split, key in (
-            (tfds.Split.TRAIN, "train"),
-            (tfds.Split.TEST, "test"),
-        ):
+        splits = ("train", "test")
+        for key in splits:
             json = [p for p in json_paths if key in p]
             h5 = [p for p in h5_paths if key in p]
             json.sort()
             h5.sort()
             paths = zip(json, h5)
-            gen = tfds.core.SplitGenerator(
-                name=split, gen_kwargs=dict(paths=paths, data_dir=data_dir)
-            )
-            out.append(gen)
+            out[key] = self._generate_examples(paths=paths, data_dir=data_dir)
         return out
 
     def _generate_examples(self, data_dir, paths):
+        count = 0
         for json_path, h5_path in paths:
             json_path = os.path.join(data_dir, json_path)
             with tf.io.gfile.GFile(json_path, "rb") as fp:
@@ -216,23 +205,25 @@ class Pointnet2H5(tfds.core.GeneratorBasedBuilder):
             # data = h5py.File(fp)
             with h5py.File(h5_path, "r") as data:
                 positions = data["data"][:]
-                face_indices = data["faceId"][:].astype(np.int64)
-                labels = data["label"][:]
+                face_indices = np.array(data["faceId"], dtype=np.int64)
+                labels = np.squeeze(data["label"], axis=1)
+                assert labels.max() == self.num_classes - 1
                 normals = data["normal"][:]
-                for i, example_index in enumerate(example_indices):
-                    label = labels[i, 0]
-                    yield (label, example_index), dict(
-                        label=label,
-                        example_index=example_index,
-                        cloud=dict(
-                            positions=positions[i],
-                            normals=normals[i],
-                            face_indices=face_indices[i],
-                        ),
-                    )
+            for i, example_index in enumerate(example_indices):
+                label = labels[i]
+                yield count, dict(
+                    label=label,
+                    example_index=example_index,
+                    cloud=dict(
+                        positions=positions[i],
+                        normals=normals[i],
+                        face_indices=face_indices[i],
+                    ),
+                )
+                count += 1
 
 
 if __name__ == "__main__":
     config = tfds.core.download.DownloadConfig(verify_ssl=False)
     builder = Pointnet2H5()
-    builder.download_and_extract(download_config=config)
+    builder.download_and_prepare(download_config=config)

@@ -3,10 +3,10 @@ import os
 
 import numpy as np
 import tensorflow as tf
-import tensorflow_datasets.public_api as tfds
-from tensorflow_datasets.core import utils as core_utils
 
+import tensorflow_datasets.public_api as tfds
 from shape_tfds.shape.shapenet.core.base import SHAPENET_URL, load_synset_ids
+from tensorflow_datasets.core import utils as core_utils
 
 NUM_OBJECT_CLASSES = 16
 NUM_PART_CLASSES = 50
@@ -153,7 +153,7 @@ class ShapenetPart2017Config(tfds.core.BuilderConfig):
                     synset = names[synset]
                     synset_index = _part_synset_index[synset_id]
                 else:
-                    raise ValueError("Unrecognized synset %d" % synset)
+                    raise ValueError(f"Unrecognized synset {synset}")
 
             name = f"{name_prefix}-{synset_id}"
         self.synset = synset
@@ -189,7 +189,10 @@ base_config = ShapenetPart2017Config()
 
 class ShapenetPart2017(tfds.core.GeneratorBasedBuilder):
     URLS = [SHAPENET_URL, ICCV2017_URL]
-    _DL_URL = "https://shapenet.cs.stanford.edu/media/shapenetcore_partanno_segmentation_benchmark_v0_normal.zip"
+    _DL_URL = (
+        "https://shapenet.cs.stanford.edu/media/"
+        "shapenetcore_partanno_segmentation_benchmark_v0_normal.zip"
+    )
 
     BUILDER_CONFIGS = [base_config]
 
@@ -219,18 +222,15 @@ class ShapenetPart2017(tfds.core.GeneratorBasedBuilder):
         )
         split_dir = os.path.join(data_dir, "train_test_split")
 
-        out = []
+        out = {}
         for split, key in (
             (tfds.Split.TRAIN, "train"),
             (tfds.Split.VALIDATION, "val"),
             (tfds.Split.TEST, "test"),
         ):
-            split_path = os.path.join(split_dir, "shuffled_%s_file_list.json" % key)
-            out.append(
-                tfds.core.SplitGenerator(
-                    name=split,
-                    gen_kwargs=dict(split_path=split_path, data_dir=data_dir),
-                )
+            split_path = os.path.join(split_dir, f"shuffled_{key}_file_list.json")
+            out[split] = self._generate_examples(
+                split_path=split_path, data_dir=data_dir
             )
         return out
 
@@ -247,14 +247,14 @@ class ShapenetPart2017(tfds.core.GeneratorBasedBuilder):
             synset_id, example_id = subpath.split("/")[1:]
             if config_synset_id is not None and synset_id != config_synset_id:
                 continue
-            path = os.path.join(data_dir, synset_id, "%s.txt" % example_id)
+            path = os.path.join(data_dir, synset_id, f"{example_id}.txt")
             with tf.io.gfile.GFile(path, "rb") as fp:
                 data = np.loadtxt(fp, dtype=np.float32)
-            positions, normals, labels = np.split(
-                data, (3, 6), axis=1
-            )  # pylint: disable=unbalanced-tuple-unpacking
+            # pylint: disable=unbalanced-tuple-unpacking
+            (positions, normals, labels) = np.split(data, (3, 6), axis=1)
+            # pylint: enable=unbalanced-tuple-unpacking
             labels = np.squeeze(labels, axis=-1)
-            yield "/".join((synset_id, example_id)), dict(
+            yield f"{synset_id}-{example_id}", dict(
                 cloud=self.builder_config.map_cloud(
                     dict(
                         positions=positions,
@@ -265,3 +265,29 @@ class ShapenetPart2017(tfds.core.GeneratorBasedBuilder):
                 label=synset_id,
                 example_id=example_id,
             )
+
+
+if __name__ == "__main__":
+    config = tfds.core.download.DownloadConfig(verify_ssl=False)
+    builder = ShapenetPart2017()
+    builder.download_and_prepare(download_config=config)
+
+    ds: tf.data.Dataset = builder.as_dataset(split="train").map(
+        lambda kwargs: tf.shape(kwargs["cloud"]["positions"])[0]
+    )
+    import matplotlib.pyplot as plt
+
+    plt.hist(list(ds), bins=20)
+    plt.show()
+    # for el in ds:
+    #     print(el.numpy())
+
+    # print(
+    #     ds.reduce(
+    #         (tf.constant(int(1e6)), tf.constant(-int(1e6))),
+    #         lambda old_state, element: (
+    #             tf.minimum(old_state[0], element),
+    #             tf.maximum(old_state[1], element),
+    #         ),
+    #     )
+    # )
